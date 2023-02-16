@@ -16,6 +16,7 @@
 #include <sycl/detail/cl.h>
 #include <sycl/detail/export.hpp>
 #include <sycl/detail/handler_proxy.hpp>
+#include <sycl/detail/host_compilation.hpp>
 #include <sycl/detail/os_util.hpp>
 #include <sycl/event.hpp>
 #include <sycl/ext/oneapi/kernel_properties/properties.hpp>
@@ -714,6 +715,14 @@ private:
     // the associated kernel handler.
     if (IsCallableWithKernelHandler) {
       getOrInsertHandlerKernelBundle(/*Insert=*/true);
+    }
+    std::cout << KI::is_host_compilation << "\n";
+    MIsHostCompilation = KI::is_host_compilation;
+    if constexpr (KI::is_host_compilation) {
+      std::cout << "Kernel name: " << KI::getName() << "\n";
+      auto HCArgs = detail::processArgsForHostCompilation(MArgs);
+      auto l = [HCArgs](detail::NDRDescT ndr) { KI::KernelHandler(HCArgs); };
+      MHostCompilationFunct = l;
     }
   }
 
@@ -2636,6 +2645,8 @@ private:
   std::vector<detail::EventImplPtr> MEventsWaitWithBarrier;
 
   bool MIsHost = false;
+  bool MIsHostCompilation = false;
+  detail::HCTask_t MHostCompilationFunct;
 
   detail::code_location MCodeLoc = {};
   bool MIsFinalized = false;

@@ -26,6 +26,7 @@
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
@@ -33,6 +34,10 @@
 #include <array>
 #include <functional>
 #include <initializer_list>
+
+llvm::cl::opt<bool>
+    SYCLHostCompilation("sycl-host-compilation", llvm::cl::init(false),
+                        llvm::cl::desc("Enable SYCL host compilation"));
 
 using namespace clang;
 using namespace std::placeholders;
@@ -5246,6 +5251,8 @@ void SYCLIntegrationHeader::emit(raw_ostream &O) {
       Printer.Visit(K.NameType);
       O << "> {\n";
     }
+    O << "static constexpr bool is_host_compilation = " << SYCLHostCompilation
+      << ";\n";
     O << "  __SYCL_DLL_LOCAL\n";
     O << "  static constexpr const char* getName() { return \"" << K.Name
       << "\"; }\n";

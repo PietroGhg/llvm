@@ -188,6 +188,7 @@ set(SYCL_SOURCES
     "exception.cpp"
     "exception_list.cpp"
     "handler.cpp"
+    "host_compilation.cpp"
     "image.cpp"
     "interop_handle.cpp"
     "interop_handler.cpp"
