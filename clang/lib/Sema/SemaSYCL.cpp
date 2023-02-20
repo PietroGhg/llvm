@@ -35,9 +35,10 @@
 #include <functional>
 #include <initializer_list>
 
-llvm::cl::opt<bool>
-    SYCLHostCompilation("sycl-host-compilation", llvm::cl::init(false),
-                        llvm::cl::desc("Enable SYCL host compilation"));
+namespace llvm {
+cl::opt<bool> SYCLHostCompilation("sycl-host-compilation", cl::init(false),
+                                  cl::desc("Enable SYCL host compilation"));
+}
 
 using namespace clang;
 using namespace std::placeholders;
@@ -5086,6 +5087,12 @@ void SYCLIntegrationHeader::emit(raw_ostream &O) {
   O << "#include <sycl/detail/defines_elementary.hpp>\n";
   O << "#include <sycl/detail/kernel_desc.hpp>\n";
 
+  if (llvm::SYCLHostCompilation) {
+    O << "#include <sycl/detail/host_compilation.hpp>\n";
+    O << "#include <iostream>\n";
+    O << "#include <vector>\n";
+  }
+
   O << "\n";
 
   LangOptions LO;
@@ -5205,6 +5212,25 @@ void SYCLIntegrationHeader::emit(raw_ostream &O) {
   }
   O << "};\n\n";
 
+  /* We emit the *subhandler function here, these are used because we
+   * don't have access to the unmangled kernel name when we generate the
+   * host compilation kernel header. KernelHandler calls this subhandler,
+   * which is defined in the host compilation kernel header, when we have
+   * info about which arguments are used in the kernel.
+   */
+  auto printSubHandler = [](raw_ostream &O, const KernelDesc &K) {
+    O << K.Name << "subhandler";
+  };
+  if (llvm::SYCLHostCompilation) {
+    O << "// Kernel subhandlers definition for host compilation.\n";
+    for (auto &Desc : KernelDescs) {
+      O << "extern \"C\" void ";
+      printSubHandler(O, Desc);
+      O << "( ";
+      O << "const std::vector<sycl::detail::HostCompilationArgDesc>& MArgs);\n";
+    }
+  }
+
   O << "// array representing signatures of all kernels defined in the\n";
   O << "// corresponding source\n";
   O << "static constexpr\n";
@@ -5251,8 +5277,18 @@ void SYCLIntegrationHeader::emit(raw_ostream &O) {
       Printer.Visit(K.NameType);
       O << "> {\n";
     }
-    O << "static constexpr bool is_host_compilation = " << SYCLHostCompilation
-      << ";\n";
+    O << "  static constexpr bool is_host_compilation = "
+      << llvm::SYCLHostCompilation << ";\n";
+
+    if (llvm::SYCLHostCompilation) {
+      O << "  static void HCKernelHandler(const "
+           "std::vector<sycl::detail::HostCompilationArgDesc>& MArgs) {\n";
+      O << "    ";
+      printSubHandler(O, K);
+      O << "(MArgs);\n";
+      O << "  }\n";
+    }
+
     O << "  __SYCL_DLL_LOCAL\n";
     O << "  static constexpr const char* getName() { return \"" << K.Name
       << "\"; }\n";

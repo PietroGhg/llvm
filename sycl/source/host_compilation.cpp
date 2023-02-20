@@ -16,7 +16,6 @@ HostCompilationArgDesc::HostCompilationArgDesc(const ArgDesc &Arg) {
 
 std::vector<HostCompilationArgDesc>
 processArgsForHostCompilation(const std::vector<ArgDesc> &MArgs) {
-  std::cout << "doot doot I'm processing\n";
   std::vector<HostCompilationArgDesc> res;
   for (auto &arg : MArgs) {
     res.emplace_back(arg);

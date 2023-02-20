@@ -720,9 +720,9 @@ private:
     MIsHostCompilation = KI::is_host_compilation;
     if constexpr (KI::is_host_compilation) {
       std::cout << "Kernel name: " << KI::getName() << "\n";
-      auto l = [MArgs = this->MArgs](detail::NDRDescT ndr) { 
+      auto l = [MArgs = this->MArgs](detail::NDRDescT ndr) {
         auto HCArgs = detail::processArgsForHostCompilation(MArgs);
-        KI::KernelHandler(HCArgs); 
+        KI::HCKernelHandler(HCArgs);
       };
       MHostCompilationFunct = l;
     }
