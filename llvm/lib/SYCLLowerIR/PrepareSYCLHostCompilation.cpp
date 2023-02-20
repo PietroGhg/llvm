@@ -65,7 +65,14 @@ namespace {
 SmallVector<bool> getArgMask(Function *F) {
   SmallVector<bool> res;
   auto UsedNode = F->getMetadata("sycl_kernel_omit_args");
-  assert(UsedNode && "No sycl_kernel_omit_args found");
+  if(!UsedNode) {
+    // the metadata node is not available if -fenable-sycl-dae
+    // was not set; set everything to true in the mask.
+    for(unsigned I = 0; I < F->getFunctionType()->getNumParams(); I++) {
+      res.push_back(true);
+    }
+    return res;
+  }
   auto NumOperands = UsedNode->getNumOperands();
   for (unsigned I = 0; I < NumOperands; I++) {
     auto &Op = UsedNode->getOperand(I);
