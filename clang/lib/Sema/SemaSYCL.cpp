@@ -34,6 +34,7 @@
 #include <array>
 #include <functional>
 #include <initializer_list>
+#include <regex>
 
 namespace llvm {
 cl::opt<bool> SYCLHostCompilation("sycl-host-compilation", cl::init(false),
@@ -1034,6 +1035,14 @@ static QualType calculateKernelNameType(ASTContext &Ctx,
   return TAL->get(0).getAsType().getCanonicalType();
 }
 
+void fixManglingForHostCompilation(std::string& Name){
+  const std::string Target("_ZTS");
+  const size_t Pos = Name.find(Target);
+  if(Pos == std::string::npos)
+    return;
+  Name.replace(Pos, Target.size(), "_Z");
+}
+
 // Gets a name for the OpenCL kernel function, calculated from the first
 // template argument of the kernel caller function.
 static std::pair<std::string, std::string>
@@ -1046,8 +1055,11 @@ constructKernelName(Sema &S, const FunctionDecl *KernelCallerFunc,
   llvm::raw_svector_ostream Out(Result);
 
   MC.mangleTypeName(KernelNameType, Out);
+  std::string MangledName(Out.str());
+  if(llvm::SYCLHostCompilation)
+    fixManglingForHostCompilation(MangledName);
 
-  return {std::string(Out.str()), SYCLUniqueStableNameExpr::ComputeName(
+  return {MangledName, SYCLUniqueStableNameExpr::ComputeName(
                                       S.getASTContext(), KernelNameType)};
 }
 
