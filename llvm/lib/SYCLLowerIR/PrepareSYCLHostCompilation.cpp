@@ -79,7 +79,7 @@ SmallVector<bool> getArgMask(Function *F) {
     auto CAM = dyn_cast<ConstantAsMetadata>(Op.get());
     auto Const = dyn_cast<ConstantInt>(CAM->getValue());
     auto Val = Const->getValue();
-    res.push_back(Val.getBoolValue());
+    res.push_back(!Val.getBoolValue());
   }
   return res;
 }
@@ -98,7 +98,7 @@ void emitKernelDecl(const Function *F, const SmallVector<bool> &argMask,
 void emitSubKernelHandler(const Function *F, const SmallVector<bool> &argMask,
                           raw_ostream &O) {
   SmallVector<unsigned> usedArgIdx;
-  O << "\nvoid " << F->getName() << "subhandler(";
+  O << "\nextern \"C\" void " << F->getName() << "subhandler(";
   O << "const std::vector<sycl::detail::HostCompilationArgDesc>& MArgs) {\n";
   for (unsigned I = 0; I < argMask.size(); I++) {
     if (argMask[I]) {
@@ -116,6 +116,15 @@ void emitSubKernelHandler(const Function *F, const SmallVector<bool> &argMask,
   O << ");\n";
   O << "};\n\n";
 }
+
+void fixCallingConv(Function* F) {
+  F->setCallingConv(llvm::CallingConv::C);
+  // TODO: the frame-pointer=all attribute apparently makes the kernel crash at runtime
+  F->setAttributes({});
+}
+
+static SmallVector<std::string> BuiltinNames{"__spirv_BuiltInGlobalInvocationId"};
+
 } // namespace
 
 PreservedAnalyses
@@ -151,6 +160,34 @@ PrepareSYCLHostCompilationPass::run(Module &M, ModuleAnalysisManager &MAM) {
     auto argMask = getArgMask(F);
     emitKernelDecl(F, argMask, O);
     emitSubKernelHandler(F, argMask, O);
+    fixCallingConv(F);
+  }
+
+  // Materialize builtins
+  // TODO: this just replaces the uses of __spirv_BuiltInGlobalInvocationId
+  // with a constant 0. Implement proper materialization.
+  for(auto& builtinName : BuiltinNames) {
+    SmallVector<Instruction*> toDelete;
+    // spirv builtins are global constants, find it in the module
+    auto Glob = M.getNamedGlobal("__spirv_BuiltInGlobalInvocationId");
+    if(!Glob)
+      continue;
+    for(auto& Use : Glob->uses()) {
+      auto load = dyn_cast<llvm::LoadInst>(Use.getUser());
+      assert(load && "Builtin use that is not a load.");
+      for(auto& LoadUse : load->uses()) {
+        auto extract = dyn_cast<llvm::ExtractElementInst>(LoadUse.getUser());
+        assert(extract && "Use of loaded builtin is not an extract");
+        // Todo replace this with the proper materialized builtin
+        auto ConstZero = llvm::ConstantInt::get(llvm::Type::getInt64Ty(M.getContext()), 0);
+        extract->replaceAllUsesWith(ConstZero);
+        toDelete.push_back(extract);
+      }
+      toDelete.push_back(load);
+    }
+    for(auto& I : toDelete)
+      I->eraseFromParent();
+    Glob->eraseFromParent();
   }
 
   return ModuleChanged ? PreservedAnalyses::all() : PreservedAnalyses::none();
