@@ -3,7 +3,7 @@
 // RUN: FileCheck -input-file=%t.h %s --check-prefix=CHECK-H
 // RUN: FileCheck -input-file=%t-hc.h %s --check-prefix=CHECK-HC
 // RUN: FileCheck -input-file=%t-no-dae.h %s --check-prefix=CHECK-NO-DAE-H
-// RaUN: FileCheck -input-file=%t-no-dae-hc.h %s --check-prefix=CHECK-NO-DAE-HC
+// RUN: FileCheck -input-file=%t-no-dae-hc.h %s --check-prefix=CHECK-NO-DAE-HC
 
 #include "sycl.hpp"
 class Test1;
@@ -19,39 +19,40 @@ int main() {
 }
 
 
-// CHECK-H: extern "C" void _Z5Test1subhandler( const std::vector<sycl::detail::HostCompilationArgDesc>& MArgs);
+// CHECK-H: extern "C" void _Z5Test1subhandler( const std::vector<sycl::detail::HostCompilationArgDesc>& MArgs, _hc_state*);
 // CHECK-H: template <> struct KernelInfo<::Test1> {
 // CHECK-H-NEXT:   static constexpr bool is_host_compilation = 1;
-// CHECK-H-NEXT:   static void HCKernelHandler(const std::vector<sycl::detail::HostCompilationArgDesc>& MArgs) {
-// CHECK-H-NEXT:     _Z5Test1subhandler(MArgs);
+// CHECK-H-NEXT:   static void HCKernelHandler(const std::vector<sycl::detail::HostCompilationArgDesc>& MArgs, _hc_state* s) {
+// CHECK-H-NEXT:     _Z5Test1subhandler(MArgs, s);
 // CHECK-H-NEXT:   }
 
 
 
 //CHECK-HC: #pragma once
 //CHECK-HC-NEXT: #include <sycl/detail/host_compilation.hpp>
-//CHECK-HC:extern "C" void _Z5Test1(void *)
-//CHECK-HC:extern "C" void _Z5Test1subhandler(const std::vector<sycl::detail::HostCompilationArgDesc>& MArgs) {
+//CHECK-HC:extern "C" void _Z5Test1(void *, _hc_state*)
+//CHECK-HC:extern "C" void _Z5Test1subhandler(const std::vector<sycl::detail::HostCompilationArgDesc>& MArgs, _hc_state *state) {
 //CHECK-HC-NEXT:  void* ptr0 = MArgs[0].getPtr();
-//CHECK-HC-NEXT:  _Z5Test1(ptr0);
+//CHECK-HC-NEXT:  _Z5Test1(ptr0, state);
 //CHECK-HC-NEXT:};
 
 
-// CHECK-NO-DAE-H: extern "C" void _Z5Test1subhandler( const std::vector<sycl::detail::HostCompilationArgDesc>& MArgs);
+// CHECK-NO-DAE-H: extern "C" void _Z5Test1subhandler( const std::vector<sycl::detail::HostCompilationArgDesc>& MArgs, _hc_state*);
 // CHECK-NO-DAE-H: template <> struct KernelInfo<::Test1> {
 // CHECK-NO-DAE-H-NEXT:   static constexpr bool is_host_compilation = 1;
-// CHECK-NO-DAE-H-NEXT:   static void HCKernelHandler(const std::vector<sycl::detail::HostCompilationArgDesc>& MArgs) {
-// CHECK-NO-DAE-H-NEXT:     _Z5Test1subhandler(MArgs);
+// CHECK-NO-DAE-H-NEXT:   static void HCKernelHandler(const std::vector<sycl::detail::HostCompilationArgDesc>& MArgs, _hc_state* s) {
+// CHECK-NO-DAE-H-NEXT:     _Z5Test1subhandler(MArgs, s);
 // CHECK-NO-DAE-H-NEXT:   }
 
 
 //CHECK-NO-DAE-HC: #pragma once
 //CHECK-NO-DAE-HC-NEXT: #include <sycl/detail/host_compilation.hpp>
-//CHECK-NO-DAE-HC: extern "C" void _Z5Test1(void *, void *, void *, void *);
-//CHECK-NO-DAE-HC:extern "C" void _Z5Test1subhandler(const std::vector<sycl::detail::HostCompilationArgDesc>& MArgs) {
+//CHECK-NO-DAE-HC:extern "C" void _Z5Test1(void *, void *, void *, void *, void *, _hc_state*);
+//CHECK-NO-DAE-HC:extern "C" void _Z5Test1subhandler(const std::vector<sycl::detail::HostCompilationArgDesc>& MArgs, _hc_state *state) {
 //CHECK-NO-DAE-HC-NEXT:  void* ptr0 = MArgs[0].getPtr();
 //CHECK-NO-DAE-HC-NEXT:  void* ptr1 = MArgs[1].getPtr();
 //CHECK-NO-DAE-HC-NEXT:  void* ptr2 = MArgs[2].getPtr();
 //CHECK-NO-DAE-HC-NEXT:  void* ptr3 = MArgs[3].getPtr();
-//CHECK-NO-DAE-HC-NEXT:  _Z5Test1(ptr0, ptr1, ptr2, ptr3);
+//CHECK-NO-DAE-HC-NEXT:  void* ptr4 = MArgs[4].getPtr();
+//CHECK-NO-DAE-HC-NEXT:  _Z5Test1(ptr0, ptr1, ptr2, ptr3, ptr4, state);
 //CHECK-NO-DAE-HC-NEXT:};
