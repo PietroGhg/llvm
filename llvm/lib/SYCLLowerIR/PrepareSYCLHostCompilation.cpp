@@ -51,8 +51,7 @@ private:
 } // namespace
 
 char PrepareSYCLHostCompilationLegacyPass::ID = 0;
-INITIALIZE_PASS(PrepareSYCLHostCompilationLegacyPass,
-                "prepare-sycl-hc",
+INITIALIZE_PASS(PrepareSYCLHostCompilationLegacyPass, "prepare-sycl-hc",
                 "Prepare SYCL Kernels for SYCL Host Compilation", false, false)
 
 // Public interface to the SYCLMutatePrintfAddrspacePass.

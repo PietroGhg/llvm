@@ -478,8 +478,6 @@ int main(int argc, char **argv) {
   initializeSYCLLowerWGLocalMemoryLegacyPass(Registry);
   initializeSYCLMutatePrintfAddrspaceLegacyPassPass(Registry);
   initializeFPBuiltinFnSelectionLegacyPassPass(Registry);
-  initializePrepareSYCLHostCompilationLegacyPassPass(Registry);
-  initializeEmitSYCLHCHeaderLegacyPassPass(Registry);
 
   SmallVector<PassPlugin, 1> PluginList;
   PassPlugins.setCallback([&](const std::string &PluginPath) {
