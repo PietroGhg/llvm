@@ -1,5 +1,5 @@
 //===------ PrepareSYCLHostCompilation.cpp - SYCL Host Compilation Preparation
-//Pass ------===//
+// Pass ------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -8,7 +8,8 @@
 //===----------------------------------------------------------------------===//
 //
 // Prepares the kernel for SYCL Host Compilation:
-// * Emits Host Compilation header.
+// * Handles kernel calling convention and attributes.
+// * Materializes spirv buitlins.
 //===----------------------------------------------------------------------===//
 
 #include "llvm/SYCLLowerIR/PrepareSYCLHostCompilation.h"
@@ -32,7 +33,7 @@ class PrepareSYCLHostCompilationLegacyPass : public ModulePass {
 public:
   static char ID;
   PrepareSYCLHostCompilationLegacyPass() : ModulePass(ID) {
-    initializeSYCLMutatePrintfAddrspaceLegacyPassPass(
+    initializePrepareSYCLHostCompilationLegacyPassPass(
         *PassRegistry::getPassRegistry());
   }
 
@@ -49,10 +50,6 @@ private:
 
 } // namespace
 
-cl::opt<std::string>
-    HCHeaderName("hc-header", cl::init(""),
-                 cl::desc("Host Compilation extra header file"));
-
 char PrepareSYCLHostCompilationLegacyPass::ID = 0;
 INITIALIZE_PASS(PrepareSYCLHostCompilationLegacyPass,
                 "PrepareSYCLHostCompilation",
@@ -64,61 +61,7 @@ ModulePass *llvm::createPrepareSYCLHostCompilationLegacyPass() {
 }
 
 namespace {
-SmallVector<bool> getArgMask(Function *F) {
-  SmallVector<bool> res;
-  auto UsedNode = F->getMetadata("sycl_kernel_omit_args");
-  if(!UsedNode) {
-    // the metadata node is not available if -fenable-sycl-dae
-    // was not set; set everything to true in the mask.
-    for(unsigned I = 0; I < F->getFunctionType()->getNumParams(); I++) {
-      res.push_back(true);
-    }
-    return res;
-  }
-  auto NumOperands = UsedNode->getNumOperands();
-  for (unsigned I = 0; I < NumOperands; I++) {
-    auto &Op = UsedNode->getOperand(I);
-    auto CAM = dyn_cast<ConstantAsMetadata>(Op.get());
-    auto Const = dyn_cast<ConstantInt>(CAM->getValue());
-    auto Val = Const->getValue();
-    res.push_back(!Val.getBoolValue());
-  }
-  return res;
-}
 
-void emitKernelDecl(const Function *F, const SmallVector<bool> &argMask,
-                    raw_ostream &O) {
-  unsigned numUsedArgs =
-      std::accumulate(argMask.begin(), argMask.end(), 0, std::plus());
-  // assert(F->getFunctionType()->getNumParams() == numUsedArgs);
-  O << "extern \"C\" void " << F->getName() << "(";
-  for (unsigned I = 0; I < numUsedArgs - 1; I++)
-    O << "void *, ";
-  O << "void *, _hc_state*);\n";
-}
-
-void emitSubKernelHandler(const Function *F, const SmallVector<bool> &argMask,
-                          raw_ostream &O) {
-  SmallVector<unsigned> usedArgIdx;
-  O << "\nextern \"C\" void " << F->getName() << "subhandler(";
-  O << "const std::vector<sycl::detail::HostCompilationArgDesc>& MArgs, "
-       "_hc_state *state) {\n";
-  for (unsigned I = 0; I < argMask.size(); I++) {
-    if (argMask[I]) {
-      O << "  void* ptr" << I << " = ";
-      O << "MArgs[" << I << "].getPtr();\n";
-      usedArgIdx.push_back(I);
-    }
-  }
-  O << "  " << F->getName() << "(";
-  for (unsigned I = 0; I < usedArgIdx.size() - 1; I++) {
-    O << "ptr" << usedArgIdx[I] << ", ";
-  }
-  if (usedArgIdx.size() >= 1)
-    O << "ptr" << usedArgIdx.back();
-  O << ", state);\n";
-  O << "};\n\n";
-}
 
 void fixCallingConv(Function* F) {
   F->setCallingConv(llvm::CallingConv::C);
@@ -126,9 +69,6 @@ void fixCallingConv(Function* F) {
   F->setAttributes({});
 }
 Function *addArg(Function *oldF, Type *T) {
-#ifdef REPLACE_DBG
-  errs() << "Adding arg: " << oldF->getName() << "\n";
-#endif
   auto oldT = oldF->getFunctionType();
   auto retT = oldT->getReturnType();
 
@@ -199,8 +139,7 @@ PrepareSYCLHostCompilationPass::run(Module &M, ModuleAnalysisManager &MAM) {
     NewKernels.push_back(newF);
     ModuleChanged |= true;
   }
-  // TODO: this just replaces the uses of __spirv_BuiltInGlobalInvocationId
-  // with a constant 0. Implement proper materialization.
+
   for (auto &entry : BuiltinNamesMap) {
     SmallVector<Instruction *> toDelete;
     // spirv builtins are global constants, find it in the module
@@ -208,7 +147,6 @@ PrepareSYCLHostCompilationPass::run(Module &M, ModuleAnalysisManager &MAM) {
     if (!Glob)
       continue;
     auto replaceFunc = getReplaceFunc(M, StatePtrType, entry.second);
-    llvm::errs() << *replaceFunc << "\n";
     for (auto &Use : Glob->uses()) {
       auto load = dyn_cast<llvm::LoadInst>(Use.getUser());
       assert(load && "Builtin use that is not a load.");
@@ -235,31 +173,7 @@ PrepareSYCLHostCompilationPass::run(Module &M, ModuleAnalysisManager &MAM) {
     Glob->eraseFromParent();
   }
 
-  // Emit host compilation helper header
-  if (HCHeaderName == "") {
-    llvm::errs() << "Please provide a valid file name for the host compilation "
-                    "header.\nExiting\n";
-    // TODO(Pietro) terminate more nicely or (better) find a better way to
-    // handle the file name
-    exit(1);
-  }
-  int HCHeaderFD = 0;
-  std::error_code EC =
-      llvm::sys::fs::openFileForWrite(HCHeaderName, HCHeaderFD);
-  if (EC) {
-    llvm::errs() << "Error: " << EC.message() << "\n";
-    // TODO(Pietro) terminate more nicely or (better) find a better way to
-    // handle the file name
-    exit(1);
-  }
-  llvm::raw_fd_ostream O(HCHeaderFD, true);
-  O << "#pragma once\n";
-  O << "#include <sycl/detail/host_compilation.hpp>\n";
-
   for (auto F : NewKernels) {
-    auto argMask = getArgMask(F);
-    emitKernelDecl(F, argMask, O);
-    emitSubKernelHandler(F, argMask, O);
     fixCallingConv(F);
   }
 

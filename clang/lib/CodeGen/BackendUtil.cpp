@@ -48,6 +48,7 @@
 #include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/SYCLLowerIR/CompileTimePropertiesPass.h"
 #include "llvm/SYCLLowerIR/ESIMD/ESIMDVerifier.h"
+#include "llvm/SYCLLowerIR/EmitSYCLHCHeader.h"
 #include "llvm/SYCLLowerIR/LowerWGLocalMemory.h"
 #include "llvm/SYCLLowerIR/MutatePrintfAddrspace.h"
 #include "llvm/SYCLLowerIR/PrepareSYCLHostCompilation.h"
@@ -1062,6 +1063,7 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
     }
 
     if (LangOpts.SYCLIsDevice && llvm::SYCLHostCompilation) {
+      MPM.addPass(EmitSYCLHCHeaderPass());
       MPM.addPass(PrepareSYCLHostCompilationPass());
     }
   }

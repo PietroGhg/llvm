@@ -400,6 +400,7 @@ void initializeSYCLLowerESIMDLegacyPassPass(PassRegistry &);
 void initializeSYCLLowerInvokeSimdLegacyPassPass(PassRegistry &);
 void initializeSYCLMutatePrintfAddrspaceLegacyPassPass(PassRegistry &);
 void initializePrepareSYCLHostCompilationLegacyPassPass(PassRegistry &);
+void initializeEmitSYCLHCHeaderLegacyPassPass(PassRegistry &);
 void initializeSPIRITTAnnotationsLegacyPassPass(PassRegistry &);
 void initializeESIMDLowerLoadStorePass(PassRegistry &);
 void initializeESIMDLowerVecArgLegacyPassPass(PassRegistry &);

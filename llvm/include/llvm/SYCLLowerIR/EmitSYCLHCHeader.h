@@ -1,5 +1,5 @@
-//===------- PrepareSYCLHostCompilation.h - Prepares module for SYCL Host
-//Compilation -------===//
+//===------- EmitSYCLHCHeader.h - Emits the SYCL Host Compilation helper header
+//-------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -7,10 +7,10 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// A transformation pass that:
-// * Handles the kernel calling convention and attributes.
-// * Materializes the spirv builtins so that they can be handled by the host
-//   runtime.
+// This pass emits the SYCL Host Compilation helper header.
+// The header mainly contatins the definition for the handler function which
+// allows to call the kernel extracted by the device compiler from the host
+// runtime.
 //===----------------------------------------------------------------------===//
 
 #pragma once
@@ -22,12 +22,11 @@ namespace llvm {
 
 class ModulePass;
 
-class PrepareSYCLHostCompilationPass
-    : public PassInfoMixin<PrepareSYCLHostCompilationPass> {
+class EmitSYCLHCHeaderPass : public PassInfoMixin<EmitSYCLHCHeaderPass> {
 public:
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM);
 };
 
-ModulePass *createPrepareSYCLHostCompilationLegacyPass();
+ModulePass *createEmitSYCLHCHeaderLegacyPass();
 
 } // namespace llvm

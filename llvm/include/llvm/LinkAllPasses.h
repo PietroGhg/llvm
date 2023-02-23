@@ -36,6 +36,7 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/SYCLLowerIR/ESIMD/ESIMDVerifier.h"
+#include "llvm/SYCLLowerIR/EmitSYCLHCHeader.h"
 #include "llvm/SYCLLowerIR/LowerInvokeSimd.h"
 #include "llvm/SYCLLowerIR/MutatePrintfAddrspace.h"
 #include "llvm/SYCLLowerIR/PrepareSYCLHostCompilation.h"
@@ -187,6 +188,8 @@ namespace {
       (void) llvm::createExpandMemCmpPass();
       (void) llvm::createExpandVectorPredicationPass();
       (void)llvm::createESIMDVerifierPass();
+      (void)llvm::createPrepareSYCLHostCompilationLegacyPass();
+      (void)llvm::createEmitSYCLHCHeaderLegacyPass();
       (void)llvm::createSYCLLowerInvokeSimdPass();
       std::string buf;
       llvm::raw_string_ostream os(buf);

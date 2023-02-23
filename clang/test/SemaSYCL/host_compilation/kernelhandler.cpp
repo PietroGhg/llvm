@@ -47,12 +47,11 @@ int main() {
 
 //CHECK-NO-DAE-HC: #pragma once
 //CHECK-NO-DAE-HC-NEXT: #include <sycl/detail/host_compilation.hpp>
-//CHECK-NO-DAE-HC:extern "C" void _Z5Test1(void *, void *, void *, void *, void *, _hc_state*);
+//CHECK-NO-DAE-HC:extern "C" void _Z5Test1(void *, void *, void *, void *, _hc_state*);
 //CHECK-NO-DAE-HC:extern "C" void _Z5Test1subhandler(const std::vector<sycl::detail::HostCompilationArgDesc>& MArgs, _hc_state *state) {
 //CHECK-NO-DAE-HC-NEXT:  void* ptr0 = MArgs[0].getPtr();
 //CHECK-NO-DAE-HC-NEXT:  void* ptr1 = MArgs[1].getPtr();
 //CHECK-NO-DAE-HC-NEXT:  void* ptr2 = MArgs[2].getPtr();
 //CHECK-NO-DAE-HC-NEXT:  void* ptr3 = MArgs[3].getPtr();
-//CHECK-NO-DAE-HC-NEXT:  void* ptr4 = MArgs[4].getPtr();
-//CHECK-NO-DAE-HC-NEXT:  _Z5Test1(ptr0, ptr1, ptr2, ptr3, ptr4, state);
+//CHECK-NO-DAE-HC-NEXT:  _Z5Test1(ptr0, ptr1, ptr2, ptr3, state);
 //CHECK-NO-DAE-HC-NEXT:};
