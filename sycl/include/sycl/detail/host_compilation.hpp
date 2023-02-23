@@ -1,5 +1,6 @@
 #pragma once
 #include "cg_types.hpp"
+#include "host_compilation_helpers.hpp"
 #include <functional>
 #include <vector>
 namespace sycl {

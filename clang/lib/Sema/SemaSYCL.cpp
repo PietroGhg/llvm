@@ -5239,7 +5239,8 @@ void SYCLIntegrationHeader::emit(raw_ostream &O) {
       O << "extern \"C\" void ";
       printSubHandler(O, Desc);
       O << "( ";
-      O << "const std::vector<sycl::detail::HostCompilationArgDesc>& MArgs);\n";
+      O << "const std::vector<sycl::detail::HostCompilationArgDesc>& MArgs, "
+           "_hc_state*);\n";
     }
   }
 
@@ -5294,10 +5295,11 @@ void SYCLIntegrationHeader::emit(raw_ostream &O) {
 
     if (llvm::SYCLHostCompilation) {
       O << "  static void HCKernelHandler(const "
-           "std::vector<sycl::detail::HostCompilationArgDesc>& MArgs) {\n";
+           "std::vector<sycl::detail::HostCompilationArgDesc>& MArgs, "
+           "_hc_state* s) {\n";
       O << "    ";
       printSubHandler(O, K);
-      O << "(MArgs);\n";
+      O << "(MArgs, s);\n";
       O << "  }\n";
     }
 
