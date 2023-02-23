@@ -52,7 +52,7 @@ private:
 
 char PrepareSYCLHostCompilationLegacyPass::ID = 0;
 INITIALIZE_PASS(PrepareSYCLHostCompilationLegacyPass,
-                "PrepareSYCLHostCompilation",
+                "prepare-sycl-hc",
                 "Prepare SYCL Kernels for SYCL Host Compilation", false, false)
 
 // Public interface to the SYCLMutatePrintfAddrspacePass.
