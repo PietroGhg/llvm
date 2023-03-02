@@ -101,10 +101,7 @@ static std::map<std::string, std::string> BuiltinNamesMap{
     {"__spirv_BuiltInGlobalInvocationId", "_hc_get_global_id"}};
 
 Function *getReplaceFunc(Module &M, Type *T, StringRef Name) {
-  Type *Int64_t = llvm::Type::getInt64Ty(M.getContext());
-  FunctionType *F_t = FunctionType::get(Int64_t, {Int64_t, T}, false);
-  Function *F =
-      dyn_cast<Function>(M.getOrInsertFunction(Name, F_t, {}).getCallee());
+  Function *F = M.getFunction(Name);
   assert(F && "Error retrieving replace function");
   return F;
 }
@@ -128,7 +125,8 @@ PrepareSYCLHostCompilationPass::run(Module &M, ModuleAnalysisManager &MAM) {
   // Materialize builtins
   // First we add a pointer to the host compilation state as arg to all the
   // kernels.
-  Type *StateType = StructType::create(M.getContext(), "struct._hc_state");
+  Type *StateType = StructType::getTypeByName(M.getContext(), "struct._hc_state");
+  assert(StateType && "Couldn't find the host compilation state in the module, make sure that -D __SYCL_HOST_COMPILATION__ is set");
   Type *StatePtrType = PointerType::getUnqual(StateType);
   SmallVector<Function *> NewKernels;
   for (auto &oldF : OldKernels) {

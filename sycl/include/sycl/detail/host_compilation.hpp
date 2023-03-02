@@ -1,6 +1,5 @@
 #pragma once
 #include "cg_types.hpp"
-#include "host_compilation_helpers.hpp"
 #include <functional>
 #include <vector>
 namespace sycl {
@@ -41,3 +40,20 @@ processArgsForHostCompilation(const std::vector<ArgDesc> &MArgs);
 } // namespace detail
 } // __SYCL_INLINE_VER_NAMESPACE(_V1)
 } // namespace sycl
+
+extern "C" struct _hc_state {
+  size_t MGlobal_id[3];
+  _hc_state() {
+    MGlobal_id[0] = 0;
+    MGlobal_id[1] = 0;
+    MGlobal_id[2] = 0;
+  }
+};
+
+#ifdef __SYCL_HOST_COMPILATION__
+#ifdef __SYCL_DEVICE_ONLY__
+extern "C" [[intel::device_indirectly_callable]] size_t _hc_get_global_id(size_t  n,__attribute((address_space(0))) _hc_state *s) {
+  return s->MGlobal_id[n];
+}
+#endif
+#endif
