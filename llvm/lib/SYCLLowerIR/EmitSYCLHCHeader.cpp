@@ -62,7 +62,7 @@ ModulePass *llvm::createEmitSYCLHCHeaderLegacyPass() {
 }
 
 namespace {
-SmallVector<bool> getArgMask(Function *F) {
+SmallVector<bool> getArgMask(const Function *F) {
   SmallVector<bool> res;
   auto UsedNode = F->getMetadata("sycl_kernel_omit_args");
   if (!UsedNode) {
@@ -77,7 +77,9 @@ SmallVector<bool> getArgMask(Function *F) {
   for (unsigned I = 0; I < NumOperands; I++) {
     auto &Op = UsedNode->getOperand(I);
     auto CAM = dyn_cast<ConstantAsMetadata>(Op.get());
+    assert(CAM && "Operand to sycl_kernel_omit_args is not a constant");
     auto Const = dyn_cast<ConstantInt>(CAM->getValue());
+    assert(Const && "Operand to sycl_kernel_omit_args is not a constant int");
     auto Val = Const->getValue();
     res.push_back(!Val.getBoolValue());
   }
@@ -88,7 +90,6 @@ void emitKernelDecl(const Function *F, const SmallVector<bool> &argMask,
                     raw_ostream &O) {
   unsigned numUsedArgs =
       std::accumulate(argMask.begin(), argMask.end(), 0, std::plus());
-  // assert(F->getFunctionType()->getNumParams() == numUsedArgs);
   O << "extern \"C\" void " << F->getName() << "(";
   for (unsigned I = 0; I < numUsedArgs - 1; I++)
     O << "void *, ";
