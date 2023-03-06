@@ -98,7 +98,7 @@ Function *addArg(Function *oldF, Type *T) {
 }
 
 static std::map<std::string, std::string> BuiltinNamesMap{
-    {"__spirv_BuiltInGlobalInvocationId", "_hc_get_global_id"}};
+    {"__spirv_BuiltInGlobalInvocationId", "_Z16hc_get_global_idmP9_hc_state"}};
 
 Function *getReplaceFunc(Module &M, Type *T, StringRef Name) {
   Function *F = M.getFunction(Name);
