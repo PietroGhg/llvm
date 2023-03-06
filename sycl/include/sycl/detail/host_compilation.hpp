@@ -52,10 +52,13 @@ extern "C" struct _hc_state {
 
 #ifdef __SYCL_HOST_COMPILATION__
 #ifdef __SYCL_DEVICE_ONLY__
-#define __SYCL_HC_ATTRS __attribute__((weak)) __attribute((alwaysinline)) [[intel::device_indirectly_callable]]
-extern "C" __SYCL_HC_ATTRS  size_t _Z16hc_get_global_idmP9_hc_state(size_t  n,__attribute((address_space(0))) _hc_state *s) {
+#define __SYCL_HC_ATTRS                                                        \
+  __attribute__((weak)) __attribute((alwaysinline))                            \
+      [[intel::device_indirectly_callable]]
+extern "C" __SYCL_HC_ATTRS size_t _Z16hc_get_global_idmP9_hc_state(
+    size_t n, __attribute((address_space(0))) _hc_state *s) {
   return s->MGlobal_id[n];
 }
-#undef __SYCL_HC_ATTRS 
+#undef __SYCL_HC_ATTRS
 #endif
 #endif
