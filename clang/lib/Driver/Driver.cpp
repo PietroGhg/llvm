@@ -801,6 +801,10 @@ static bool isValidSYCLTriple(llvm::Triple T) {
   if (T.isAMDGCN())
     return true;
 
+  // X86 as target triple enables SYCL host compilation
+  if (T.isX86())
+    return true;
+
   // Check for invalid SYCL device triple values.
   // Non-SPIR arch.
   if (!T.isSPIR())
@@ -9570,6 +9574,7 @@ const ToolChain &Driver::getOffloadingDeviceToolChain(const ArgList &Args,
         switch (Target.getArch()) {
           case llvm::Triple::spir:
           case llvm::Triple::spir64:
+          case llvm::Triple::x86_64:
             TC = std::make_unique<toolchains::SYCLToolChain>(
               *this, Target, HostTC, Args);
             break;
