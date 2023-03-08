@@ -37,6 +37,18 @@ __SYCL_EXPORT
 std::vector<HostCompilationArgDesc>
 processArgsForHostCompilation(const std::vector<ArgDesc> &MArgs);
 
+// Helper class to determine wheter or not the KernelInfo struct has 
+// the is_host_compilation field, and if it is true or false.
+template <typename T, class Enable = void>
+struct IsHostCompilation {
+  static constexpr bool value = false;
+};
+
+template <typename T>
+struct IsHostCompilation<T, typename std::enable_if<T::is_host_compilation>::type> {
+  static constexpr bool value = T::is_host_compilation;
+};
+
 } // namespace detail
 } // __SYCL_INLINE_VER_NAMESPACE(_V1)
 } // namespace sycl

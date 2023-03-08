@@ -717,10 +717,8 @@ private:
     if (IsCallableWithKernelHandler) {
       getOrInsertHandlerKernelBundle(/*Insert=*/true);
     }
-    std::cout << KI::is_host_compilation << "\n";
-    MIsHostCompilation = KI::is_host_compilation;
-    if constexpr (KI::is_host_compilation) {
-      std::cout << "Kernel name: " << KI::getName() << "\n";
+    if constexpr (detail::IsHostCompilation<KI>::value) {
+      MIsHostCompilation = true;
       auto l = [MArgs = this->MArgs](detail::NDRDescT ndr) {
         _hc_state state;
         auto HCArgs = detail::processArgsForHostCompilation(MArgs);
