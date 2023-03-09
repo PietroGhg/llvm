@@ -247,9 +247,9 @@ event handler::finalize() {
     // Copy kernel name here instead of move so that it's available after
     // running of this method by reductions implementation. This allows for
     // assert feature to check if kernel uses assertions
-    if (MIsHostCompilation) {
+    if (MImpl->MHostCompilationFunct) {
       // reset the host kernel pointer to the optimized host kernel
-      detail::HCTask *HCTPtr = new detail::HCTask(MHostCompilationFunct);
+      detail::HCTask *HCTPtr = new detail::HCTask(MImpl->MHostCompilationFunct);
       MHostKernel.reset(HCTPtr);
     }
     CommandGroup.reset(new detail::CGExecKernel(
