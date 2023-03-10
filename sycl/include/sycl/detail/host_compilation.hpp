@@ -1,6 +1,7 @@
 #pragma once
 #include "cg_types.hpp"
 #include <functional>
+#include <memory>
 #include <vector>
 namespace sycl {
 __SYCL_INLINE_VER_NAMESPACE(_V1) {
@@ -10,9 +11,9 @@ using HCTask_t = std::function<void(NDRDescT)>;
 
 class HCTask : public HostKernelBase {
 public:
-  HCTask(HCTask_t Task) : MTask(Task) {}
+  HCTask(std::shared_ptr<HCTask_t> Task) : MTask(Task) {}
   void call(const NDRDescT &NDRDesc, HostProfilingInfo *HPI) override {
-    MTask(NDRDesc);
+    (*MTask)(NDRDesc);
   }
   // Return pointer to the lambda object.
   // Used to extract captured variables.
@@ -22,7 +23,7 @@ public:
   }
 
 private:
-  HCTask_t MTask;
+  std::shared_ptr<HCTask_t> MTask;
 };
 
 class __SYCL_EXPORT HostCompilationArgDesc {
@@ -36,6 +37,18 @@ public:
 __SYCL_EXPORT
 std::vector<HostCompilationArgDesc>
 processArgsForHostCompilation(const std::vector<ArgDesc> &MArgs);
+
+// Helper class to determine wheter or not the KernelInfo struct has
+// the is_host_compilation field, and if it is true or false.
+template <typename T, class Enable = void> struct IsHostCompilation {
+  static constexpr bool value = false;
+};
+
+template <typename T>
+struct IsHostCompilation<
+    T, typename std::enable_if<T::is_host_compilation>::type> {
+  static constexpr bool value = T::is_host_compilation;
+};
 
 } // namespace detail
 } // __SYCL_INLINE_VER_NAMESPACE(_V1)

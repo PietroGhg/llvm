@@ -276,6 +276,8 @@ private:
 using sycl::detail::enable_if_t;
 using sycl::detail::queue_impl;
 
+__SYCL_EXPORT void setHostCompilationImpl(std::shared_ptr<handler_impl> &MImpl,
+                                          std::shared_ptr<HCTask_t> &task);
 } // namespace detail
 
 /// Command group handler class.
@@ -717,25 +719,23 @@ private:
     if (IsCallableWithKernelHandler) {
       getOrInsertHandlerKernelBundle(/*Insert=*/true);
     }
-    std::cout << KI::is_host_compilation << "\n";
-    MIsHostCompilation = KI::is_host_compilation;
-    if constexpr (KI::is_host_compilation) {
-      std::cout << "Kernel name: " << KI::getName() << "\n";
-      auto l = [MArgs = this->MArgs](detail::NDRDescT ndr) {
-        _hc_state state;
-        auto HCArgs = detail::processArgsForHostCompilation(MArgs);
-        for (unsigned dim0 = 0; dim0 < ndr.GlobalSize[0]; dim0++) {
-          for (unsigned dim1 = 0; dim1 < ndr.GlobalSize[1]; dim1++) {
-            for (unsigned dim2 = 0; dim2 < ndr.GlobalSize[2]; dim2++) {
-              state.MGlobal_id[0] = dim0;
-              state.MGlobal_id[1] = dim1;
-              state.MGlobal_id[2] = dim2;
-              KI::HCKernelHandler(HCArgs, &state);
+    if constexpr (detail::IsHostCompilation<KI>::value) {
+      auto l = std::make_shared<detail::HCTask_t>(
+          [MArgs = this->MArgs](detail::NDRDescT ndr) {
+            _hc_state state;
+            auto HCArgs = detail::processArgsForHostCompilation(MArgs);
+            for (unsigned dim0 = 0; dim0 < ndr.GlobalSize[0]; dim0++) {
+              for (unsigned dim1 = 0; dim1 < ndr.GlobalSize[1]; dim1++) {
+                for (unsigned dim2 = 0; dim2 < ndr.GlobalSize[2]; dim2++) {
+                  state.MGlobal_id[0] = dim0;
+                  state.MGlobal_id[1] = dim1;
+                  state.MGlobal_id[2] = dim2;
+                  KI::HCKernelHandler(HCArgs, &state);
+                }
+              }
             }
-          }
-        }
-      };
-      MHostCompilationFunct = l;
+          });
+      detail::setHostCompilationImpl(MImpl, l);
     }
   }
 
@@ -2743,8 +2743,6 @@ private:
   std::vector<detail::EventImplPtr> MEventsWaitWithBarrier;
 
   bool MIsHost = false;
-  bool MIsHostCompilation = false;
-  detail::HCTask_t MHostCompilationFunct;
 
   detail::code_location MCodeLoc = {};
   bool MIsFinalized = false;

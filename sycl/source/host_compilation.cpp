@@ -1,4 +1,5 @@
 #include "detail/accessor_impl.hpp"
+#include "detail/handler_impl.hpp"
 #include <iostream>
 #include <sycl/detail/host_compilation.hpp>
 
@@ -21,6 +22,11 @@ processArgsForHostCompilation(const std::vector<ArgDesc> &MArgs) {
     res.emplace_back(arg);
   }
   return res;
+}
+
+void setHostCompilationImpl(std::shared_ptr<handler_impl> &MImpl,
+                            std::shared_ptr<HCTask_t> &task) {
+  MImpl->MHostCompilationFunct = task;
 }
 
 } // namespace detail
