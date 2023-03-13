@@ -4846,6 +4846,9 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   bool IsFPGASYCLOffloadDevice =
       IsSYCLOffloadDevice &&
       Triple.getSubArch() == llvm::Triple::SPIRSubArch_fpga;
+  bool IsSYCLHostCompilation =
+      Args.hasFlag(options::OPT_fsycl_host_compilation,
+                   options::OPT_fno_sycl_host_compilation, false);
 
   // Perform the SYCL host compilation using an external compiler if the user
   // requested.
@@ -4976,7 +4979,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
                       options::OPT_fno_sycl_early_optimizations,
                       !IsFPGASYCLOffloadDevice))
       CmdArgs.push_back("-fno-sycl-early-optimizations");
-    else if (RawTriple.isSPIR() || RawTriple.isX86()) {
+    else if (RawTriple.isSPIR() || IsSYCLHostCompilation) {
       // Set `sycl-opt` option to configure LLVM passes for SPIR target
       CmdArgs.push_back("-mllvm");
       CmdArgs.push_back("-sycl-opt");
