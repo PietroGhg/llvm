@@ -91,7 +91,6 @@
 #include "llvm/Support/Host.h"
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/MD5.h"
-#include "llvm/Support/MathExtras.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Process.h"
@@ -102,9 +101,9 @@
 #include <cstdlib> // ::getenv
 #include <map>
 #include <memory>
-#include <optional>
 #include <regex>
 #include <sstream>
+#include <optional>
 #include <utility>
 #if LLVM_ON_UNIX
 #include <unistd.h> // getpid
