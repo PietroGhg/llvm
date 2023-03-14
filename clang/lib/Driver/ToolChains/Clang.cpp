@@ -4984,6 +4984,11 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
       CmdArgs.push_back("-mllvm");
       CmdArgs.push_back("-sycl-opt");
     }
+    if(Args.hasFlag(options::OPT_fsycl_host_compilation,
+                               options::OPT_fno_sycl_host_compilation, false)) {
+      CmdArgs.push_back("-mllvm");
+      CmdArgs.push_back("-sycl-host-compilation");
+    }
 
     // Turn on Dead Parameter Elimination Optimization with early optimizations
     // TODO: Enable DAE by default without the Optimization level check in the
