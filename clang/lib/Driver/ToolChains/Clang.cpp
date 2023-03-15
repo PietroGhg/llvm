@@ -4988,6 +4988,8 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
                                options::OPT_fno_sycl_host_compilation, false)) {
       CmdArgs.push_back("-mllvm");
       CmdArgs.push_back("-sycl-host-compilation");
+      CmdArgs.push_back("-D");
+      CmdArgs.push_back("__SYCL_HOST_COMPILATION__");
     }
 
     // Turn on Dead Parameter Elimination Optimization with early optimizations
