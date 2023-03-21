@@ -10,8 +10,8 @@
 #define LLVM_CLANG_LIB_DRIVER_TOOLCHAINS_SYCL_H
 
 #include "clang/Driver/Options.h"
-#include "clang/Driver/ToolChain.h"
 #include "clang/Driver/Tool.h"
+#include "clang/Driver/ToolChain.h"
 
 namespace clang {
 namespace driver {
@@ -209,14 +209,12 @@ private:
                              llvm::opt::OptSpecifier Opt_EQ) const;
 };
 
-
 } // end namespace toolchains
 
-template <typename ArgListT>
-bool isSYCLHostCompilation(const ArgListT &Args) {
+template <typename ArgListT> bool isSYCLHostCompilation(const ArgListT &Args) {
   return Args.hasFlag(options::OPT_fsycl_host_compilation,
-                               options::OPT_fno_sycl_host_compilation, false);
-} 
+                      options::OPT_fno_sycl_host_compilation, false);
+}
 } // end namespace driver
 } // end namespace clang
 

@@ -5673,11 +5673,14 @@ class OffloadingActionBuilder final {
             FullDeviceLinkAction = FullLinkObject;
 
           bool IsSYCLHostCompilation = isSYCLHostCompilation(Args);
-          if(IsSYCLHostCompilation) {
-            // for SYCL host compilation, we just take the linked device modules,
-            // lower them to a shared lib, and it to the host shared lib.
-            auto *backendAct = C.MakeAction<BackendJobAction>(FullDeviceLinkAction, types::TY_PP_Asm);
-            auto *asmAct = C.MakeAction<AssembleJobAction>(backendAct, types::TY_Object);
+          if (IsSYCLHostCompilation) {
+            // for SYCL host compilation, we just take the linked device
+            // modules, lower them to a shared lib, and it to the host shared
+            // lib.
+            auto *backendAct = C.MakeAction<BackendJobAction>(
+                FullDeviceLinkAction, types::TY_PP_Asm);
+            auto *asmAct =
+                C.MakeAction<AssembleJobAction>(backendAct, types::TY_Object);
             DA.add(*asmAct, *TC, BoundArch, Action::OFK_SYCL);
             return;
           }
@@ -6997,13 +7000,13 @@ void Driver::BuildActions(Compilation &C, DerivedArgList &Args,
         TmpFileFooter = C.addTempFile(C.getArgs().MakeArgString(OutName));
       }
       addIntegrationFiles(TmpFileHeader, TmpFileFooter, SrcFileName);
-      if(isSYCLHostCompilation(Args)){
+      if (isSYCLHostCompilation(Args)) {
         std::string TmpFileNameHCHeader;
         TmpFileNameHCHeader.append(C.getDriver().GetUniquePath(
-              OutFileDir.c_str() + StemmedSrcFileName + "-hc-header", "h"));
-      StringRef TmpHCHeader =
-          C.addTempFile(C.getArgs().MakeArgString(TmpFileNameHCHeader));
-      addIntegrationHCHeader(TmpHCHeader, SrcFileName);
+            OutFileDir.c_str() + StemmedSrcFileName + "-hc-header", "h"));
+        StringRef TmpHCHeader =
+            C.addTempFile(C.getArgs().MakeArgString(TmpFileNameHCHeader));
+        addIntegrationHCHeader(TmpHCHeader, SrcFileName);
       }
     }
   }

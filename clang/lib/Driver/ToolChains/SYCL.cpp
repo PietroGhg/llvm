@@ -1067,8 +1067,8 @@ Tool *SYCLToolChain::buildBackendCompiler() const {
 }
 
 Tool *SYCLToolChain::buildLinker() const {
-   // assert(getTriple().getArch() == llvm::Triple::spir ||
-   //        getTriple().getArch() == llvm::Triple::spir64);
+  // assert(getTriple().getArch() == llvm::Triple::spir ||
+  //        getTriple().getArch() == llvm::Triple::spir64);
   return new tools::SYCL::Linker(*this);
 }
 

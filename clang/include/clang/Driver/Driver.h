@@ -878,7 +878,8 @@ public:
   }
 
   /// add integration helper header for host compilation
-  void addIntegrationHCHeader(StringRef HCHeaderName, StringRef FileName) const {
+  void addIntegrationHCHeader(StringRef HCHeaderName,
+                              StringRef FileName) const {
     HCIntegrationFiles.insert({FileName, HCHeaderName});
   }
   /// getIntegrationHeader - Get the integration header file

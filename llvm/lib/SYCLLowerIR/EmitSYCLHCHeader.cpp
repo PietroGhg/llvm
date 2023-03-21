@@ -34,7 +34,8 @@ public:
   EmitSYCLHCHeaderLegacyPass() : ModulePass(ID) {
     initializeEmitSYCLHCHeaderLegacyPassPass(*PassRegistry::getPassRegistry());
   }
-  EmitSYCLHCHeaderLegacyPass(const std::string& FileName) : ModulePass(ID), Impl(FileName) {
+  EmitSYCLHCHeaderLegacyPass(const std::string &FileName)
+      : ModulePass(ID), Impl(FileName) {
     initializeEmitSYCLHCHeaderLegacyPassPass(*PassRegistry::getPassRegistry());
   }
 

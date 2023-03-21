@@ -25,9 +25,9 @@ class ModulePass;
 class EmitSYCLHCHeaderPass : public PassInfoMixin<EmitSYCLHCHeaderPass> {
 public:
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM);
-  EmitSYCLHCHeaderPass(const std::string& FileName) : 
-    HCHeaderName(FileName) {}
+  EmitSYCLHCHeaderPass(const std::string &FileName) : HCHeaderName(FileName) {}
   EmitSYCLHCHeaderPass() = default;
+
 private:
   std::string HCHeaderName;
 };

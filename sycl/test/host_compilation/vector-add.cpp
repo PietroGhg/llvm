@@ -4,7 +4,6 @@
 // RUN: %clangxx -L %sycl_libs_dir -lsycl %t-kernel.o %t-host.o -o %t
 // RUN: env ONEAPI_DEVICE_SELECTOR="host:*" %t
 
-
 #include <CL/sycl.hpp>
 
 #include <array>
