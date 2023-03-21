@@ -34,8 +34,10 @@ public:
   EmitSYCLHCHeaderLegacyPass() : ModulePass(ID) {
     initializeEmitSYCLHCHeaderLegacyPassPass(*PassRegistry::getPassRegistry());
   }
+  EmitSYCLHCHeaderLegacyPass(const std::string& FileName) : ModulePass(ID), Impl(FileName) {
+    initializeEmitSYCLHCHeaderLegacyPassPass(*PassRegistry::getPassRegistry());
+  }
 
-  // run the SYCLMutatePrintfAddrspace pass on the specified module
   bool runOnModule(Module &M) override {
     ModuleAnalysisManager MAM;
     auto PA = Impl.run(M, MAM);
@@ -44,13 +46,10 @@ public:
 
 private:
   EmitSYCLHCHeaderPass Impl;
+  std::string HCHeaderName;
 };
 
 } // namespace
-
-cl::opt<std::string>
-    HCHeaderName("hc-header", cl::init(""),
-                 cl::desc("Host Compilation extra header file"));
 
 char EmitSYCLHCHeaderLegacyPass::ID = 0;
 INITIALIZE_PASS(EmitSYCLHCHeaderLegacyPass, "emit-sycl-hc-header",

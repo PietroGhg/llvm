@@ -1138,9 +1138,8 @@ void Driver::CreateOffloadingDeviceToolChains(Compilation &C,
       Diag(clang::diag::err_drv_invalid_sycl_target) << Val;
   }
   bool HasSYCLTargetsOption = SYCLTargets || SYCLLinkTargets || SYCLAddTargets;
-  bool IsSYCLHostCompilation =
-      C.getInputArgs().hasFlag(options::OPT_fsycl_host_compilation,
-                               options::OPT_fno_sycl_host_compilation, false);
+  bool IsSYCLHostCompilation = isSYCLHostCompilation(C.getInputArgs());
+
   llvm::StringMap<StringRef> FoundNormalizedTriples;
   llvm::SmallVector<llvm::Triple, 4> UniqueSYCLTriplesVec;
   if (!IsSYCLHostCompilation && HasSYCLTargetsOption) {
@@ -5673,6 +5672,16 @@ class OffloadingActionBuilder final {
           } else
             FullDeviceLinkAction = FullLinkObject;
 
+          bool IsSYCLHostCompilation = isSYCLHostCompilation(Args);
+          if(IsSYCLHostCompilation) {
+            // for SYCL host compilation, we just take the linked device modules,
+            // lower them to a shared lib, and it to the host shared lib.
+            auto *backendAct = C.MakeAction<BackendJobAction>(FullDeviceLinkAction, types::TY_PP_Asm);
+            auto *asmAct = C.MakeAction<AssembleJobAction>(backendAct, types::TY_Object);
+            DA.add(*asmAct, *TC, BoundArch, Action::OFK_SYCL);
+            return;
+          }
+
           // reflects whether current target is ahead-of-time and can't
           // support runtime setting of specialization constants
           bool isAOT = isNVPTX || isAMDGCN || isSpirvAOT;
@@ -6041,9 +6050,7 @@ class OffloadingActionBuilder final {
       bool GpuInitHasErrors = false;
       bool HasSYCLTargetsOption =
           SYCLAddTargets || SYCLTargets || SYCLLinkTargets;
-      bool IsSYCLHostCompilation = C.getInputArgs().hasFlag(
-          options::OPT_fsycl_host_compilation,
-          options::OPT_fno_sycl_host_compilation, false);
+      bool IsSYCLHostCompilation = isSYCLHostCompilation(C.getInputArgs());
       if (IsSYCLHostCompilation && HasSYCLTargetsOption) {
         C.getDriver().Diag(clang::diag::warn_drv_sycl_host_comp_and_targets);
       }
@@ -6990,6 +6997,14 @@ void Driver::BuildActions(Compilation &C, DerivedArgList &Args,
         TmpFileFooter = C.addTempFile(C.getArgs().MakeArgString(OutName));
       }
       addIntegrationFiles(TmpFileHeader, TmpFileFooter, SrcFileName);
+      if(isSYCLHostCompilation(Args)){
+        std::string TmpFileNameHCHeader;
+        TmpFileNameHCHeader.append(C.getDriver().GetUniquePath(
+              OutFileDir.c_str() + StemmedSrcFileName + "-hc-header", "h"));
+      StringRef TmpHCHeader =
+          C.addTempFile(C.getArgs().MakeArgString(TmpFileNameHCHeader));
+      addIntegrationHCHeader(TmpHCHeader, SrcFileName);
+      }
     }
   }
 
@@ -9557,9 +9572,7 @@ const ToolChain &Driver::getToolChain(const ArgList &Args,
 const ToolChain &Driver::getOffloadingDeviceToolChain(const ArgList &Args,
                   const llvm::Triple &Target, const ToolChain &HostTC,
                   const Action::OffloadKind &TargetDeviceOffloadKind) const {
-  bool IsSYCLHostCompilation =
-      Args.hasFlag(options::OPT_fsycl_host_compilation,
-                   options::OPT_fno_sycl_host_compilation, false);
+  bool IsSYCLHostCompilation = isSYCLHostCompilation(Args);
   // Use device / host triples offload kind as the key into the ToolChains map
   // because the device ToolChain we create depends on both.
   auto &TC = ToolChains[Target.str() + "/" + HostTC.getTriple().str() +

@@ -6691,6 +6691,11 @@ def fsycl_int_footer : Separate<["-"], "fsycl-int-footer">,
   MarshallingInfoString<LangOpts<"SYCLIntFooter">>;
 def fsycl_int_footer_EQ : Joined<["-"], "fsycl-int-footer=">,
   Alias<fsycl_int_footer>;
+def fsycl_hc_header : Separate<["-"], "fsycl-hc-header">,
+  HelpText<"Generate SYCL host compilation helper header into this file.">,
+  MarshallingInfoString<LangOpts<"SYCLHCHeader">>;
+def fsycl_hc_header_EQ : Joined<["-"], "fsycl-hc-header=">,
+  Alias<fsycl_hc_header>;
 def fsycl_unique_prefix_EQ
     : Joined<["-"], "fsycl-unique-prefix=">,
       HelpText<"A unique prefix for this translation unit across devices, used "

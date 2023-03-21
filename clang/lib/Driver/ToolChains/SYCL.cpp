@@ -325,10 +325,10 @@ void SYCL::Linker::ConstructJob(Compilation &C, const JobAction &JA,
                                 const ArgList &Args,
                                 const char *LinkingOutput) const {
 
-  assert((getToolChain().getTriple().isSPIR() ||
-          getToolChain().getTriple().isNVPTX() ||
-          getToolChain().getTriple().isAMDGCN()) &&
-         "Unsupported target");
+  // assert((getToolChain().getTriple().isSPIR() ||
+  //         getToolChain().getTriple().isNVPTX() ||
+  //         getToolChain().getTriple().isAMDGCN()) &&
+  //        "Unsupported target");
 
   std::string SubArchName =
       std::string(getToolChain().getTriple().getArchName());
@@ -1067,8 +1067,8 @@ Tool *SYCLToolChain::buildBackendCompiler() const {
 }
 
 Tool *SYCLToolChain::buildLinker() const {
-  assert(getTriple().getArch() == llvm::Triple::spir ||
-         getTriple().getArch() == llvm::Triple::spir64);
+   // assert(getTriple().getArch() == llvm::Triple::spir ||
+   //        getTriple().getArch() == llvm::Triple::spir64);
   return new tools::SYCL::Linker(*this);
 }
 
