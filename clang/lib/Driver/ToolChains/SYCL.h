@@ -199,6 +199,7 @@ protected:
   Tool *buildLinker() const override;
 
 private:
+  bool IsSYCLHostCompilation;
   void TranslateTargetOpt(const llvm::opt::ArgList &Args,
                           llvm::opt::ArgStringList &CmdArgs,
                           llvm::opt::OptSpecifier Opt,
