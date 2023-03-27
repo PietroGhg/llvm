@@ -5092,6 +5092,11 @@ static void OutputStableNameInChars(raw_ostream &O, StringRef Name) {
   }
 }
 
+// Name of the EC header generated after code generation
+// TODO: remove once integration header generation was moved
+// to a later stage.
+extern llvm::cl::opt<std::string> HCHeaderName;
+
 void SYCLIntegrationHeader::emit(raw_ostream &O) {
   O << "// This is auto-generated SYCL integration header.\n";
   O << "\n";
@@ -5234,14 +5239,16 @@ void SYCLIntegrationHeader::emit(raw_ostream &O) {
     O << K.Name << "subhandler";
   };
   if (llvm::SYCLHostCompilation) {
-    O << "// Kernel subhandlers definition for host compilation.\n";
-    for (auto &Desc : KernelDescs) {
-      O << "extern \"C\" void ";
-      printSubHandler(O, Desc);
-      O << "( ";
-      O << "const std::vector<sycl::detail::HostCompilationArgDesc>& MArgs, "
-           "_hc_state*);\n";
-    }
+    // This is a temporary workaround for the integration header file
+    // being emitted too early.
+    llvm::StringRef HCName = HCHeaderName;
+    if (HCName == "")
+      HCHeaderName.setInitialValue(S.getLangOpts().SYCLIntHeader + ".hc");
+
+    O << "\n// including the kernel handlers calling the kernels\n";
+    O << "\n#include \"";
+    O << HCHeaderName;
+    O << "\"\n\n";
   }
 
   O << "// array representing signatures of all kernels defined in the\n";
@@ -5294,7 +5301,7 @@ void SYCLIntegrationHeader::emit(raw_ostream &O) {
       << llvm::SYCLHostCompilation << ";\n";
 
     if (llvm::SYCLHostCompilation) {
-      O << "  static void HCKernelHandler(const "
+      O << "  static inline void HCKernelHandler(const "
            "std::vector<sycl::detail::HostCompilationArgDesc>& MArgs, "
            "_hc_state* s) {\n";
       O << "    ";
