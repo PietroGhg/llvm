@@ -12,6 +12,7 @@
 #include "clang/Driver/DriverDiagnostic.h"
 #include "clang/Driver/InputInfo.h"
 #include "clang/Driver/Options.h"
+#include "llvm/Option/Option.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
@@ -329,8 +330,8 @@ void SYCL::Linker::ConstructJob(Compilation &C, const JobAction &JA,
 
   assert((getToolChain().getTriple().isSPIR() ||
           getToolChain().getTriple().isNVPTX() ||
-          getToolChain().getTriple().isAMDGCN()) &&
-         "Unsupported target");
+          getToolChain().getTriple().isAMDGCN()) ||
+         isSYCLHostCompilation(Args) && "Unsupported target");
 
   std::string SubArchName =
       std::string(getToolChain().getTriple().getArchName());
@@ -803,7 +804,8 @@ void SYCL::x86_64::BackendCompiler::ConstructJob(
 
 SYCLToolChain::SYCLToolChain(const Driver &D, const llvm::Triple &Triple,
                              const ToolChain &HostTC, const ArgList &Args)
-    : ToolChain(D, Triple, Args), HostTC(HostTC) {
+    : ToolChain(D, Triple, Args), HostTC(HostTC),
+      IsSYCLHostCompilation(isSYCLHostCompilation(Args)) {
   // Lookup binaries into the driver directory, this is used to
   // discover the clang-offload-bundler executable.
   getProgramPaths().push_back(getDriver().Dir);
@@ -1066,7 +1068,8 @@ Tool *SYCLToolChain::buildBackendCompiler() const {
 
 Tool *SYCLToolChain::buildLinker() const {
   assert(getTriple().getArch() == llvm::Triple::spir ||
-         getTriple().getArch() == llvm::Triple::spir64);
+         getTriple().getArch() == llvm::Triple::spir64 ||
+         IsSYCLHostCompilation);
   return new tools::SYCL::Linker(*this);
 }
 

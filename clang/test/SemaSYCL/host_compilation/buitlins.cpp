@@ -1,4 +1,4 @@
-// RUN: %clangxx -fsycl-device-only  -D __SYCL_HOST_COMPILATION__ -mllvm -sycl-host-compilation -mllvm -hc-header=%t-hc.h -sycl-std=2020 -mllvm -sycl-opt -S -emit-llvm  -o - %s | FileCheck %s
+// RUN: %clangxx -fsycl-device-only  -D __SYCL_HOST_COMPILATION__ -mllvm -sycl-host-compilation -Xclang -fsycl-hc-header=%t-hc.h -sycl-std=2020 -mllvm -sycl-opt -S -emit-llvm  -o - %s | FileCheck %s
 
 #include "sycl.hpp"
 class Test1;

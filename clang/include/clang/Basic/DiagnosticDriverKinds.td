@@ -177,6 +177,9 @@ def err_drv_bad_fpga_device_count : Error<
 def warn_drv_mismatch_fpga_archive : Warning<
   "FPGA archive '%0' does not contain matching emulation/hardware expectancy">,
   InGroup<SyclFPGAMismatch>;
+def warn_drv_sycl_host_comp_and_targets: Warning<
+  "-fsycl-host-compilation overrides SYCL targets option">,
+  InGroup<SyclHCTargets>;
 def err_drv_unsupported_opt_dpcpp : Error<"option '%0' unsupported with DPC++">;
 def err_drv_argument_only_allowed_with : Error<
   "invalid argument '%0' only allowed with '%1'">;

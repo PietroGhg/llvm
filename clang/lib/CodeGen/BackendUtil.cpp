@@ -1053,7 +1053,7 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
     }
 
     if (LangOpts.SYCLIsDevice && llvm::SYCLHostCompilation) {
-      MPM.addPass(EmitSYCLHCHeaderPass());
+      MPM.addPass(EmitSYCLHCHeaderPass(LangOpts.SYCLHCHeader));
       MPM.addPass(PrepareSYCLHostCompilationPass());
     }
   }

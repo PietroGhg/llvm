@@ -1,4 +1,4 @@
-// RUN: %clangxx -fsycl-device-only  -D __SYCL_HOST_COMPILATION__ -mllvm -sycl-host-compilation -Xclang -fsycl-int-header=%t.h -mllvm -hc-header=%t-hc.h -sycl-std=2020 -emit-llvm-bc -o %t.bc %s 
+// RUN: %clangxx -fsycl-device-only  -fsycl-host-compilation -Xclang -fsycl-int-header=%t.h -Xclang -fsycl-hc-header=%t-hc.h -o %t.bc %s 
 // RUN: FileCheck -input-file=%t.h %s --check-prefix=CHECK-H
 // RUN: FileCheck -input-file=%t-hc.h %s --check-prefix=CHECK-HC
 
