@@ -16,10 +16,13 @@
 
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/Operator.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/ValueMapper.h"
 #include <functional>
@@ -145,25 +148,54 @@ PrepareSYCLHostCompilationPass::run(Module &M, ModuleAnalysisManager &MAM) {
       continue;
     auto replaceFunc = getReplaceFunc(M, StatePtrType, entry.second);
     for (auto &Use : Glob->uses()) {
-      auto load = dyn_cast<llvm::LoadInst>(Use.getUser());
-      assert(load && "Builtin use that is not a load.");
-      for (auto &LoadUse : load->uses()) {
-        auto extract = dyn_cast<llvm::ExtractElementInst>(LoadUse.getUser());
-        assert(extract && "Use of loaded builtin is not an extract");
-        // replace "extract <builtin> <index>" with
-        // "call builtin_func(<index>, state)". the state is the last argument
-        // of the kernel function
-        auto index = extract->getOperand(1);
-        auto stateArg = getStateArg(extract->getFunction());
-        assert(stateArg->getType() == StatePtrType);
-        auto newCall =
-            llvm::CallInst::Create(replaceFunc->getFunctionType(), replaceFunc,
-                                   {index, stateArg}, "hc_builtin", extract);
-        extract->replaceAllUsesWith(newCall);
-        toDelete.push_back(extract);
-        ModuleChanged = true;
+      if (isa<LoadInst>(Use.getUser())) {
+        auto load = dyn_cast<llvm::LoadInst>(Use.getUser());
+        // the builtin is used in a load -> extractelement pattern
+        for (auto &LoadUse : load->uses()) {
+          auto extract = dyn_cast<llvm::ExtractElementInst>(LoadUse.getUser());
+          assert(extract && "Use of loaded builtin is not an extract");
+          // replace "extract <builtin> <index>" with
+          // "call builtin_func(<index>, state)". the state is the last argument
+          // of the kernel function
+          auto index = extract->getOperand(1);
+          auto stateArg = getStateArg(extract->getFunction());
+          assert(stateArg->getType() == StatePtrType);
+          auto newCall = llvm::CallInst::Create(replaceFunc->getFunctionType(),
+                                                replaceFunc, {index, stateArg},
+                                                "hc_builtin", extract);
+          extract->replaceAllUsesWith(newCall);
+          toDelete.push_back(extract);
+          ModuleChanged = true;
+        }
+        toDelete.push_back(load);
+      } else if (isa<GEPOperator>(Use.getUser())) {
+        // the builting is used as val = load (gep builtin 0 <index>)
+        // we replace it with val = builtin(<index>)
+        auto GEPOp = dyn_cast<GEPOperator>(Use.getUser());
+        assert(GEPOp->getNumIndices() == 2 &&
+               "Unsupported GEPOperator in builtin use");
+        auto Index = (GEPOp->op_begin() + 2)->get();
+        for (auto &GEPOpUse : GEPOp->uses()) {
+          auto *Load = dyn_cast<LoadInst>(GEPOpUse.getUser());
+          if (!Load) {
+            // Todo: the gepoperator here seems to have dead uses that are still
+            // linked
+            assert(GEPOpUse.getUser()->getNumUses() == 0);
+            continue;
+          }
+          assert(Load && "GEPOperator use is not a load");
+          auto stateArg = getStateArg(Load->getFunction());
+          assert(stateArg->getType() == StatePtrType);
+          auto newCall = llvm::CallInst::Create(replaceFunc->getFunctionType(),
+                                                replaceFunc, {Index, stateArg},
+                                                "hc_builtin", Load);
+          Load->replaceAllUsesWith(newCall);
+          toDelete.push_back(Load);
+        }
+
+      } else {
+        llvm_unreachable("Unsupported builtin use");
       }
-      toDelete.push_back(load);
     }
     for (auto &I : toDelete)
       I->eraseFromParent();

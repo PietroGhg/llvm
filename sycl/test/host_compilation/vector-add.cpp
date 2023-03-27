@@ -16,24 +16,25 @@ class SimpleVadd;
 
 int main() {
   const size_t N = 4;
-  std::array<int, N> A = {{1, 2, 3, 4}},
-                                           B = {{2, 3, 4, 5}}, C{{0,0,0,0}};
+  std::array<int, N> A = {{1, 2, 3, 4}}, B = {{2, 3, 4, 5}}, C{{0, 0, 0, 0}};
   cl::sycl::queue deviceQueue;
   cl::sycl::range<1> numOfItems{N};
   cl::sycl::buffer<int, 1> bufferA(A.data(), numOfItems);
   cl::sycl::buffer<int, 1> bufferB(B.data(), numOfItems);
   cl::sycl::buffer<int, 1> bufferC(C.data(), numOfItems);
 
-  deviceQueue.submit([&](cl::sycl::handler& cgh) {
-    auto accessorA = bufferA.get_access<sycl_read>(cgh);
-    auto accessorB = bufferB.get_access<sycl_read>(cgh);
-    auto accessorC = bufferC.get_access<sycl_write>(cgh);
+  deviceQueue
+      .submit([&](cl::sycl::handler &cgh) {
+        auto accessorA = bufferA.get_access<sycl_read>(cgh);
+        auto accessorB = bufferB.get_access<sycl_read>(cgh);
+        auto accessorC = bufferC.get_access<sycl_write>(cgh);
 
-    auto kern = [=](cl::sycl::id<1> wiID) {
-      accessorC[wiID] = accessorA[wiID] + accessorB[wiID];
-    };
-    cgh.parallel_for<class SimpleVadd>(numOfItems, kern);
-  }).wait();
+        auto kern = [=](cl::sycl::id<1> wiID) {
+          accessorC[wiID] = accessorA[wiID] + accessorB[wiID];
+        };
+        cgh.parallel_for<class SimpleVadd>(numOfItems, kern);
+      })
+      .wait();
 
   for (unsigned int i = 0; i < N; i++) {
     std::cout << "C[" << i << "] = " << C[i] << "\n";
@@ -46,4 +47,3 @@ int main() {
   std::cout << "The results are correct!\n";
   return 0;
 }
-
