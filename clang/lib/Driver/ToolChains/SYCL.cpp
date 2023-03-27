@@ -330,8 +330,9 @@ void SYCL::Linker::ConstructJob(Compilation &C, const JobAction &JA,
 
   assert((getToolChain().getTriple().isSPIR() ||
           getToolChain().getTriple().isNVPTX() ||
-          getToolChain().getTriple().isAMDGCN()) ||
-         isSYCLHostCompilation(Args) && "Unsupported target");
+          getToolChain().getTriple().isAMDGCN() ||
+          isSYCLHostCompilation(Args)) &&
+         "Unsupported target");
 
   std::string SubArchName =
       std::string(getToolChain().getTriple().getArchName());

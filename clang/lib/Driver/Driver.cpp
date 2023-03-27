@@ -7004,7 +7004,7 @@ void Driver::BuildActions(Compilation &C, DerivedArgList &Args,
       addIntegrationFiles(TmpFileHeader, TmpFileFooter, SrcFileName);
       if (isSYCLHostCompilation(Args)) {
         std::string TmpFileNameHCHeader;
-        if(IsSaveTemps) {
+        if (IsSaveTemps) {
           TmpFileNameHCHeader.append(C.getDriver().GetUniquePath(
               OutFileDir.c_str() + StemmedSrcFileName + "-hc-header", "h"));
         } else {
