@@ -28,9 +28,9 @@ int main() {
 
 //CHECK-HC: #pragma once
 //CHECK-HC-NEXT: #include <sycl/detail/host_compilation.hpp>
-//CHECK-HC:extern "C" void _Z5Test1(void *, void *, _hc_state*);
+//CHECK-HC:extern "C" void _Z5Test1(void *, void *, _hc_state *);
 //CHECK-HC:extern "C" void _Z5Test1subhandler(const std::vector<sycl::detail::HostCompilationArgDesc>& MArgs, _hc_state *state) {
-//CHECK-HC-NEXT:  void* ptr0 = MArgs[0].getPtr();
-//CHECK-HC-NEXT:  void* ptr3 = MArgs[3].getPtr();
-//CHECK-HC-NEXT:  _Z5Test1(ptr0, ptr3, state);
+//CHECK-HC-NEXT:  void* arg0 = MArgs[0].getPtr();
+//CHECK-HC-NEXT:  void* arg3 = MArgs[3].getPtr();
+//CHECK-HC-NEXT:  _Z5Test1(arg0, arg3, state);
 //CHECK-HC-NEXT:};

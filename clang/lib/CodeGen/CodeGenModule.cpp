@@ -79,6 +79,10 @@ static llvm::cl::opt<bool> LimitedCoverage(
     "limited-coverage-experimental", llvm::cl::Hidden,
     llvm::cl::desc("Emit limited coverage mapping information (experimental)"));
 
+namespace llvm {
+extern cl::opt<bool> SYCLHostCompilation;
+}
+
 static const char AnnotationSection[] = "llvm.metadata";
 
 static CGCXXABI *createCXXABI(CodeGenModule &CGM) {
@@ -2069,6 +2073,10 @@ void CodeGenModule::GenKernelArgMetadata(llvm::Function *Fn,
                       llvm::MDNode::get(VMContext, argSYCLAccessorPtrs));
       Fn->setMetadata("kernel_arg_exclusive_ptr",
                       llvm::MDNode::get(VMContext, argSYCLAccessorPtrs));
+    }
+    if (llvm::SYCLHostCompilation) {
+      Fn->setMetadata("kernel_arg_type",
+                      llvm::MDNode::get(VMContext, argTypeNames));
     }
   } else {
     if (getLangOpts().OpenCL || getLangOpts().SYCLIsDevice) {

@@ -220,8 +220,6 @@ PrepareSYCLHostCompilationPass::run(Module &M, ModuleAnalysisManager &MAM) {
       }
     }
     for (auto &I : toDelete) {
-      llvm::errs() << "[PTRDBG] deleting: " << *I << "\n";
-      llvm::errs() << "[PTRDBG] from: " << *I->getFunction() << "\n";
       I->eraseFromParent();
     }
     Glob->eraseFromParent();

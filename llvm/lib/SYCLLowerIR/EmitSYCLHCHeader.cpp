@@ -13,12 +13,15 @@
 
 #include "llvm/SYCLLowerIR/EmitSYCLHCHeader.h"
 
+#include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/Type.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/ValueMapper.h"
 #include <functional>
@@ -86,37 +89,82 @@ SmallVector<bool> getArgMask(const Function *F) {
   return res;
 }
 
+SmallVector<StringRef> getArgTypeNames(const Function *F) {
+  SmallVector<StringRef> Res;
+  auto *TNNode = F->getMetadata("kernel_arg_type");
+  assert(TNNode &&
+         "kernel_arg_type metadata node is required for sycl host compilation");
+  auto NumOperands = TNNode->getNumOperands();
+  for (unsigned I = 0; I < NumOperands; I++) {
+    auto &Op = TNNode->getOperand(I);
+    auto *MDS = dyn_cast<MDString>(Op.get());
+    assert(MDS && "kernel_arg_types operand not a metadata string");
+    Res.push_back(MDS->getString());
+  }
+  return Res;
+}
+
 void emitKernelDecl(const Function *F, const SmallVector<bool> &argMask,
+                    const SmallVector<StringRef> &ArgTypeNames,
                     raw_ostream &O) {
-  unsigned numUsedArgs =
-      std::accumulate(argMask.begin(), argMask.end(), 0, std::plus());
+  auto EmitArgDecl = [&](const Argument *Arg, unsigned Index) {
+    Type *ArgTy = Arg->getType();
+    if (isa<PointerType>(ArgTy))
+      return "void *";
+    return ArgTypeNames[Index].data();
+  };
+
+  auto NumParams = F->getFunctionType()->getNumParams();
   O << "extern \"C\" void " << F->getName() << "(";
-  for (unsigned I = 0; I < numUsedArgs - 1; I++)
-    O << "void *, ";
-  O << "void *, _hc_state*);\n";
+  unsigned I = 0, UsedI = 0;
+  for (; I < argMask.size() - 1 && UsedI < NumParams - 1; I++) {
+    if (!argMask[I])
+      continue;
+    O << EmitArgDecl(F->getArg(UsedI), I) << ", ";
+    UsedI++;
+  }
+  O << EmitArgDecl(F->getArg(UsedI), I) << ", _hc_state *);\n";
 }
 
 void emitSubKernelHandler(const Function *F, const SmallVector<bool> &argMask,
+                          const SmallVector<StringRef> &ArgTypeNames,
                           raw_ostream &O) {
   SmallVector<unsigned> usedArgIdx;
+  auto EmitParamCast = [&](Argument *Arg, unsigned Index) {
+    std::string Res;
+    llvm::raw_string_ostream OS(Res);
+    usedArgIdx.push_back(Index);
+    if (isa<PointerType>(Arg->getType())) {
+      OS << "  void* arg" << Index << " = ";
+      OS << "MArgs[" << Index << "].getPtr();\n";
+      return OS.str();
+    }
+    auto TN = ArgTypeNames[Index].str();
+    OS << "  " << TN << " arg" << Index << " = ";
+    OS << "*(" << TN << "*)"
+       << "MArgs[" << Index << "].getPtr();\n";
+    return OS.str();
+  };
+
   O << "\nextern \"C\" void " << F->getName() << "subhandler(";
   O << "const std::vector<sycl::detail::HostCompilationArgDesc>& MArgs, "
        "_hc_state *state) {\n";
   // Retrieve only the args that are used
-  for (unsigned I = 0; I < argMask.size(); I++) {
+  for (unsigned I = 0, UsedI = 0;
+       I < argMask.size() && UsedI < F->getFunctionType()->getNumParams();
+       I++) {
     if (argMask[I]) {
-      O << "  void* ptr" << I << " = ";
-      O << "MArgs[" << I << "].getPtr();\n";
-      usedArgIdx.push_back(I);
+      O << EmitParamCast(F->getArg(UsedI), I);
+      UsedI++;
     }
   }
   // Emit the actual kernel call
   O << "  " << F->getName() << "(";
   for (unsigned I = 0; I < usedArgIdx.size() - 1; I++) {
-    O << "ptr" << usedArgIdx[I] << ", ";
+    O << "arg" << usedArgIdx[I] << ", ";
   }
   if (usedArgIdx.size() >= 1)
-    O << "ptr" << usedArgIdx.back();
+    O << "arg" << usedArgIdx.back();
   O << ", state);\n";
   O << "};\n\n";
 }
@@ -155,8 +203,9 @@ PreservedAnalyses EmitSYCLHCHeaderPass::run(Module &M,
 
   for (auto F : Kernels) {
     auto argMask = getArgMask(F);
-    emitKernelDecl(F, argMask, O);
-    emitSubKernelHandler(F, argMask, O);
+    auto ArgTypeNames = getArgTypeNames(F);
+    emitKernelDecl(F, argMask, ArgTypeNames, O);
+    emitSubKernelHandler(F, argMask, ArgTypeNames, O);
   }
 
   return ModuleChanged ? PreservedAnalyses::all() : PreservedAnalyses::none();
