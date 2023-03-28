@@ -14,6 +14,9 @@
 
 #include "llvm/SYCLLowerIR/PrepareSYCLHostCompilation.h"
 
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Operator.h"
@@ -150,24 +153,42 @@ PrepareSYCLHostCompilationPass::run(Module &M, ModuleAnalysisManager &MAM) {
     for (auto &Use : Glob->uses()) {
       if (isa<LoadInst>(Use.getUser())) {
         auto load = dyn_cast<llvm::LoadInst>(Use.getUser());
+        auto StateArg = getStateArg(load->getFunction());
         // the builtin is used in a load -> extractelement pattern
-        for (auto &LoadUse : load->uses()) {
-          auto extract = dyn_cast<llvm::ExtractElementInst>(LoadUse.getUser());
-          assert(extract && "Use of loaded builtin is not an extract");
-          // replace "extract <builtin> <index>" with
-          // "call builtin_func(<index>, state)". the state is the last argument
-          // of the kernel function
-          auto index = extract->getOperand(1);
-          auto stateArg = getStateArg(extract->getFunction());
-          assert(stateArg->getType() == StatePtrType);
-          auto newCall = llvm::CallInst::Create(replaceFunc->getFunctionType(),
-                                                replaceFunc, {index, stateArg},
-                                                "hc_builtin", extract);
-          extract->replaceAllUsesWith(newCall);
-          toDelete.push_back(extract);
+        bool IsExtractUse = llvm::all_of(load->uses(), [](class Use &U) {
+          return isa<ExtractElementInst>(U.getUser());
+        });
+        if (IsExtractUse) {
+          for (auto &LoadUse : load->uses()) {
+            auto extract =
+                dyn_cast<llvm::ExtractElementInst>(LoadUse.getUser());
+            if (!extract)
+              llvm::errs() << *load->getFunction()->getParent() << "\n";
+            // replace "extract <builtin> <index>" with
+            // "call builtin_func(<index>, state)". the state is the last
+            // argument of the kernel function
+            Value *index = extract->getOperand(1);
+            assert(StateArg->getType() == StatePtrType);
+            auto newCall = llvm::CallInst::Create(
+                replaceFunc->getFunctionType(), replaceFunc, {index, StateArg},
+                "hc_builtin", extract);
+            extract->replaceAllUsesWith(newCall);
+            toDelete.push_back(extract);
+            ModuleChanged = true;
+          }
+          toDelete.push_back(load);
+        } else {
+          // this is a load straight from the builtin, replace with a call with
+          // index 0
+          auto &Ctx = load->getContext();
+          Value *NewIndex = ConstantInt::get(IntegerType::get(Ctx, 64), 0);
+          auto *NewCall = llvm::CallInst::Create(
+              replaceFunc->getFunctionType(), replaceFunc, {NewIndex, StateArg},
+              "hc_builtin", load);
+          load->replaceAllUsesWith(NewCall);
+          toDelete.push_back(load);
           ModuleChanged = true;
         }
-        toDelete.push_back(load);
       } else if (isa<GEPOperator>(Use.getUser())) {
         // the builting is used as val = load (gep builtin 0 <index>)
         // we replace it with val = builtin(<index>)
@@ -191,14 +212,18 @@ PrepareSYCLHostCompilationPass::run(Module &M, ModuleAnalysisManager &MAM) {
                                                 "hc_builtin", Load);
           Load->replaceAllUsesWith(newCall);
           toDelete.push_back(Load);
+          ModuleChanged = true;
         }
 
       } else {
         llvm_unreachable("Unsupported builtin use");
       }
     }
-    for (auto &I : toDelete)
+    for (auto &I : toDelete) {
+      llvm::errs() << "[PTRDBG] deleting: " << *I << "\n";
+      llvm::errs() << "[PTRDBG] from: " << *I->getFunction() << "\n";
       I->eraseFromParent();
+    }
     Glob->eraseFromParent();
   }
 
