@@ -4,13 +4,13 @@ The SYCL Host Compilation flow aims at treating the host CPU as a "first class c
 
 # Compiler and runtime options
 
-The SYCL Host Compilation flow is enabled by the `-fsycl-host-compilation` compiler option, e.g.
+The SYCL Host Compilation flow is enabled by the `-fsycl-host-compilation` compiler option (please note that currently `-fsycl-host-compilation` overrides any other sycl target specified in the compiler invocation):
 
 ```
 clang++ -fsycl -fsycl-host-compilation <input> -o <output>
 ```
 
-This will perform automatically all the compilation stages, it is also possible to manually perform all the necessary compiler invocations. This is more verbose but allows the user to use an arbitrary host compiler for the second compilation stage:
+This will perform automatically all the compilation stages. It is also possible to manually perform all the necessary compiler invocations, this is more verbose but allows the user to use an arbitrary host compiler for the second compilation stage:
 
 ```
 #device compiler
@@ -28,7 +28,7 @@ clang++ <device-ir> -o <device-o>
 clang++ -L<sycl-lib-path> -lsycl <device-o> <host-o> -o <output>
 ```
 
-Our implementation currenyl piggy backs on the original (library only) SYCL Host Device, therefore in order to run an application compiled with `-fsycl-host-compilation`, you need to set the environment variable `ONEAPI_DEVICE_SELECTOR=host:*` to make sure that the SYCL runtime chooses the host device to execute the application.
+Our implementation currently piggy backs on the original (library only) SYCL Host Device, therefore in order to run an application compiled with `-fsycl-host-compilation`, you need to set the environment variable `ONEAPI_DEVICE_SELECTOR=host:*` to make sure that the SYCL runtime chooses the host device to execute the application.
 
 # Supported features and limitations
 
