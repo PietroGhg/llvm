@@ -32,6 +32,6 @@ Our implementation currenyl piggy backs on the original (library only) SYCL Host
 
 # Supported features and limitations
 
-The SYCL Host Compilation flow is still WIP, and several core SYCL features are currently unsupported. Currently only `parallel_for`s over `sycl::range` are supported, attempting to use `local_size`, `local `barrier` and any math builtin will most likely fail with an `undefined reference` error at link time. Examples of supported applications can be found in the [runtime tests](./test/host_compilation).
+The SYCL Host Compilation flow is still WIP, and several core SYCL features are currently unsupported. Currently only `parallel_for`s over `sycl::range` are supported, attempting to use `local_size`, `local `barrier` and any math builtin will most likely fail with an `undefined reference` error at link time. Examples of supported applications can be found in the [runtime tests](sycl/test/host_compilation).
 
 
