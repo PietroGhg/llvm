@@ -1138,9 +1138,11 @@ void Driver::CreateOffloadingDeviceToolChains(Compilation &C,
       Diag(clang::diag::err_drv_invalid_sycl_target) << Val;
   }
   bool HasSYCLTargetsOption = SYCLTargets || SYCLLinkTargets || SYCLAddTargets;
+  bool IsSYCLHostCompilation = isSYCLHostCompilation(C.getInputArgs());
+
   llvm::StringMap<StringRef> FoundNormalizedTriples;
   llvm::SmallVector<llvm::Triple, 4> UniqueSYCLTriplesVec;
-  if (HasSYCLTargetsOption) {
+  if (!IsSYCLHostCompilation && HasSYCLTargetsOption) {
     // At this point, we know we have a valid combination
     // of -fsycl*target options passed
     Arg *SYCLTargetsValues = SYCLTargets ? SYCLTargets : SYCLLinkTargets;
@@ -1264,6 +1266,11 @@ void Driver::CreateOffloadingDeviceToolChains(Compilation &C,
         Diag(clang::diag::warn_drv_empty_joined_argument)
             << SYCLAddTargets->getAsString(C.getInputArgs());
     }
+  } else if (IsSYCLHostCompilation) {
+    const ToolChain *HostTC = C.getSingleOffloadToolChain<Action::OFK_Host>();
+    llvm::Triple HostTriple = HostTC->getTriple();
+    UniqueSYCLTriplesVec.push_back(HostTriple);
+    addSYCLDefaultTriple(C, UniqueSYCLTriplesVec);
   } else {
     // If -fsycl is supplied without -fsycl-*targets we will assume SPIR-V
     // unless -fintelfpga is supplied, which uses SPIR-V with fpga AOT.
@@ -5665,6 +5672,19 @@ class OffloadingActionBuilder final {
           } else
             FullDeviceLinkAction = FullLinkObject;
 
+          bool IsSYCLHostCompilation = isSYCLHostCompilation(Args);
+          if (IsSYCLHostCompilation) {
+            // for SYCL host compilation, we just take the linked device
+            // modules, lower them to a shared lib, and it to the host shared
+            // lib.
+            auto *backendAct = C.MakeAction<BackendJobAction>(
+                FullDeviceLinkAction, types::TY_PP_Asm);
+            auto *asmAct =
+                C.MakeAction<AssembleJobAction>(backendAct, types::TY_Object);
+            DA.add(*asmAct, *TC, BoundArch, Action::OFK_SYCL);
+            return;
+          }
+
           // reflects whether current target is ahead-of-time and can't
           // support runtime setting of specialization constants
           bool isAOT = isNVPTX || isAMDGCN || isSpirvAOT;
@@ -6033,7 +6053,11 @@ class OffloadingActionBuilder final {
       bool GpuInitHasErrors = false;
       bool HasSYCLTargetsOption =
           SYCLAddTargets || SYCLTargets || SYCLLinkTargets;
-      if (HasSYCLTargetsOption) {
+      bool IsSYCLHostCompilation = isSYCLHostCompilation(C.getInputArgs());
+      if (IsSYCLHostCompilation && HasSYCLTargetsOption) {
+        C.getDriver().Diag(clang::diag::warn_drv_sycl_host_comp_and_targets);
+      }
+      if (!IsSYCLHostCompilation && HasSYCLTargetsOption) {
         if (SYCLTargets || SYCLLinkTargets) {
           Arg *SYCLTargetsValues = SYCLTargets ? SYCLTargets : SYCLLinkTargets;
           // Fill SYCLTripleList
@@ -6153,6 +6177,14 @@ class OffloadingActionBuilder final {
               GpuArchList.emplace_back(TT, nullptr);
           }
         }
+      } else if (IsSYCLHostCompilation) {
+        const ToolChain *HostTC =
+            C.getSingleOffloadToolChain<Action::OFK_Host>();
+        llvm::Triple TT = HostTC->getTriple();
+        auto TCIt = llvm::find_if(
+            ToolChains, [&](auto &TC) { return TT == TC->getTriple(); });
+        SYCLTripleList.push_back(TT);
+        SYCLTargetInfoList.emplace_back(*TCIt, nullptr);
       } else if (HasValidSYCLRuntime) {
         // -fsycl is provided without -fsycl-*targets.
         bool SYCLfpga = C.getInputArgs().hasArg(options::OPT_fintelfpga);
@@ -6968,6 +7000,20 @@ void Driver::BuildActions(Compilation &C, DerivedArgList &Args,
         TmpFileFooter = C.addTempFile(C.getArgs().MakeArgString(OutName));
       }
       addIntegrationFiles(TmpFileHeader, TmpFileFooter, SrcFileName);
+      if (isSYCLHostCompilation(Args)) {
+        std::string TmpFileNameHCHeader;
+        if(IsSaveTemps) {
+          TmpFileNameHCHeader.append(C.getDriver().GetUniquePath(
+              OutFileDir.c_str() + StemmedSrcFileName + "-hc-header", "h"));
+        } else {
+          TmpFileNameHCHeader.append(C.getDriver().GetTemporaryPath(
+              OutFileDir.c_str() + StemmedSrcFileName + "-hc-header", "h"));
+        }
+
+        StringRef TmpHCHeader =
+            C.addTempFile(C.getArgs().MakeArgString(TmpFileNameHCHeader));
+        addIntegrationHCHeader(TmpHCHeader, SrcFileName);
+      }
     }
   }
 
@@ -9535,6 +9581,7 @@ const ToolChain &Driver::getToolChain(const ArgList &Args,
 const ToolChain &Driver::getOffloadingDeviceToolChain(const ArgList &Args,
                   const llvm::Triple &Target, const ToolChain &HostTC,
                   const Action::OffloadKind &TargetDeviceOffloadKind) const {
+  bool IsSYCLHostCompilation = isSYCLHostCompilation(Args);
   // Use device / host triples offload kind as the key into the ToolChains map
   // because the device ToolChain we create depends on both.
   auto &TC = ToolChains[Target.str() + "/" + HostTC.getTriple().str() +
@@ -9583,6 +9630,10 @@ const ToolChain &Driver::getOffloadingDeviceToolChain(const ArgList &Args,
                 *this, Target, HostTC, Args, TargetDeviceOffloadKind);
             break;
           default:
+            if (IsSYCLHostCompilation) {
+              TC = std::make_unique<toolchains::SYCLToolChain>(*this, Target,
+                                                               HostTC, Args);
+            }
           break;
         }
       break;

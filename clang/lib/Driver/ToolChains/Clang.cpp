@@ -4846,6 +4846,9 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   bool IsFPGASYCLOffloadDevice =
       IsSYCLOffloadDevice &&
       Triple.getSubArch() == llvm::Triple::SPIRSubArch_fpga;
+  bool IsSYCLHostCompilation =
+      Args.hasFlag(options::OPT_fsycl_host_compilation,
+                   options::OPT_fno_sycl_host_compilation, false);
 
   // Perform the SYCL host compilation using an external compiler if the user
   // requested.
@@ -4976,10 +4979,19 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
                       options::OPT_fno_sycl_early_optimizations,
                       !IsFPGASYCLOffloadDevice))
       CmdArgs.push_back("-fno-sycl-early-optimizations");
-    else if (RawTriple.isSPIR()) {
+    else if (RawTriple.isSPIR() || IsSYCLHostCompilation) {
       // Set `sycl-opt` option to configure LLVM passes for SPIR target
       CmdArgs.push_back("-mllvm");
       CmdArgs.push_back("-sycl-opt");
+    }
+    if (IsSYCLHostCompilation) {
+      CmdArgs.push_back("-mllvm");
+      CmdArgs.push_back("-sycl-host-compilation");
+      CmdArgs.push_back("-D");
+      CmdArgs.push_back("__SYCL_HOST_COMPILATION__");
+      CmdArgs.push_back("-fsycl-hc-header");
+      CmdArgs.push_back(
+          Args.MakeArgString(D.getHCHelperHeader(Input.getBaseInput())));
     }
 
     // Turn on Dead Parameter Elimination Optimization with early optimizations
@@ -5158,6 +5170,11 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
       // Let the FE know we are doing a SYCL offload compilation, but we are
       // doing the host pass.
       CmdArgs.push_back("-fsycl-is-host");
+      if (IsSYCLHostCompilation) {
+        CmdArgs.push_back("-include");
+        CmdArgs.push_back(
+            Args.MakeArgString(D.getHCHelperHeader(Input.getBaseInput())));
+      }
 
       if (!D.IsCLMode()) {
         // SYCL library is guaranteed to work correctly only with dynamic
@@ -5283,7 +5300,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
         CmdArgs.push_back("-fdirectives-only");
     }
   } else if (isa<AssembleJobAction>(JA)) {
-    if (IsSYCLOffloadDevice) {
+    if (IsSYCLOffloadDevice && !IsSYCLHostCompilation) {
       CmdArgs.push_back("-emit-llvm-bc");
     } else {
       CmdArgs.push_back("-emit-obj");
