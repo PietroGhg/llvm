@@ -18,11 +18,10 @@ int main() {
     // Getting write only access to the buffer on a device.
     sycl::accessor Accessor{Buffer, cgh, sycl::write_only};
     // Executing kernel
-    cgh.parallel_for<class FillBuffer>(
-        NumOfWorkItems, [=](sycl::id<1> WIid) {
-          // Fill buffer with indexes.
-          Accessor[WIid] = WIid.get(0);
-        });
+    cgh.parallel_for<class FillBuffer>(NumOfWorkItems, [=](sycl::id<1> WIid) {
+      // Fill buffer with indexes.
+      Accessor[WIid] = WIid.get(0);
+    });
   });
 
   // Getting read only access to the buffer on the host.
@@ -46,4 +45,3 @@ int main() {
 
   return MismatchFound;
 }
-

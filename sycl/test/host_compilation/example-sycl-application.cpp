@@ -62,7 +62,7 @@ int main() {
 
     /* This kernel enqueue will initialise buffer a. The accessor "A" has
      * write access. */
-    myQueue.submit([&](handler& cgh) {
+    myQueue.submit([&](handler &cgh) {
       auto A = a.get_access<access::mode::write>(cgh);
       cgh.parallel_for<init_a>(range<2>{N, M}, [=](id<2> index) {
         A[index] = index[0] * 2 + index[1];
@@ -74,7 +74,7 @@ int main() {
      * can use this information to recognise that these kernels are
      * actually independent of each other. Therefore, they can be enqueued
      * to the device with no dependencies between each other. */
-    myQueue.submit([&](handler& cgh) {
+    myQueue.submit([&](handler &cgh) {
       auto B = b.get_access<access::mode::write>(cgh);
       cgh.parallel_for<init_b>(range<2>{N, M}, [=](id<2> index) {
         B[index] = index[0] * 2014 + index[1] * 42;
@@ -87,7 +87,7 @@ int main() {
      * previous kernels. If the data were initialised on a different device,
      * or on the host, the SYCL runtime would ensure that the data were
      * copied between contexts etc. properly. */
-    myQueue.submit([&](handler& cgh) {
+    myQueue.submit([&](handler &cgh) {
       auto A = a.get_access<access::mode::read>(cgh);
       auto B = b.get_access<access::mode::read>(cgh);
       auto C = c.get_access<access::mode::write>(cgh);
