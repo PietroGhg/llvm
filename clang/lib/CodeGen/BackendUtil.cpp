@@ -763,6 +763,15 @@ static void addSanitizers(const Triple &TargetTriple,
   }
 }
 
+// Uwe todo: find better place for this function, if we need it
+// at all. Currently also used by SemaSYCL
+std::string getHCHeaderName(const LangOptions& LangOpts) {
+  std::string HCName = LangOpts.SYCLHCHeader;
+  if (HCName == "")
+    HCName = LangOpts.SYCLIntHeader + ".hc";
+  return HCName;
+}
+
 void EmitAssemblyHelper::RunOptimizationPipeline(
     BackendAction Action, std::unique_ptr<raw_pwrite_stream> &OS,
     std::unique_ptr<llvm::ToolOutputFile> &ThinLinkOS) {
@@ -1053,7 +1062,7 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
     }
 
     if (LangOpts.SYCLIsDevice && llvm::SYCLHostCompilation) {
-      MPM.addPass(EmitSYCLHCHeaderPass(LangOpts.SYCLHCHeader));
+      MPM.addPass(EmitSYCLHCHeaderPass(getHCHeaderName(LangOpts)));
       MPM.addPass(PrepareSYCLHostCompilationPass());
     }
   }

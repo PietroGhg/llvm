@@ -116,12 +116,19 @@ void emitKernelDecl(const Function *F, const SmallVector<bool> &argMask,
 
   auto NumParams = F->getFunctionType()->getNumParams();
   O << "extern \"C\" void " << F->getName() << "(";
+
   unsigned I = 0, UsedI = 0;
   for (; I < argMask.size() - 1 && UsedI < NumParams - 1; I++) {
     if (!argMask[I])
       continue;
     O << EmitArgDecl(F->getArg(UsedI), I) << ", ";
     UsedI++;
+  }
+
+  // parameters may have been removed.
+  if (UsedI == 0) {
+    O << ");\n";
+    return;
   }
   O << EmitArgDecl(F->getArg(UsedI), I) << ", _hc_state *);\n";
 }
@@ -146,7 +153,7 @@ void emitSubKernelHandler(const Function *F, const SmallVector<bool> &argMask,
     return OS.str();
   };
 
-  O << "\nextern \"C\" void " << F->getName() << "subhandler(";
+  O << "\ninline static void " << F->getName() << "subhandler(";
   O << "const std::vector<sycl::detail::HostCompilationArgDesc>& MArgs, "
        "_hc_state *state) {\n";
   // Retrieve only the args that are used
@@ -160,12 +167,16 @@ void emitSubKernelHandler(const Function *F, const SmallVector<bool> &argMask,
   }
   // Emit the actual kernel call
   O << "  " << F->getName() << "(";
-  for (unsigned I = 0; I < usedArgIdx.size() - 1; I++) {
-    O << "arg" << usedArgIdx[I] << ", ";
+  if (usedArgIdx.size() == 0) {
+    O << ");\n";
+  } else {
+    for (unsigned I = 0; I < usedArgIdx.size() - 1; I++) {
+      O << "arg" << usedArgIdx[I] << ", ";
+    }
+    if (usedArgIdx.size() >= 1)
+      O << "arg" << usedArgIdx.back();
+    O << ", state);\n";
   }
-  if (usedArgIdx.size() >= 1)
-    O << "arg" << usedArgIdx.back();
-  O << ", state);\n";
   O << "};\n\n";
 }
 

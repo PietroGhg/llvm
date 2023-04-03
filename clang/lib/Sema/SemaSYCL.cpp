@@ -1035,7 +1035,12 @@ static QualType calculateKernelNameType(ASTContext &Ctx,
   return TAL->get(0).getAsType().getCanonicalType();
 }
 
-void fixManglingForHostCompilation(std::string& Name){
+// Kernel names are currently mangled as type names which
+// may collide (in the IR) with the "real" type names generated
+// for RTTI etc when compiling host and device code together.
+// Therefore the mangling of the kernel function is changed for
+// HostCompilation to avoid such potential collision.
+static void fixManglingForHostCompilation(std::string& Name){
   const std::string Target("_ZTS");
   const size_t Pos = Name.find(Target);
   if(Pos == std::string::npos)
@@ -1056,11 +1061,19 @@ constructKernelName(Sema &S, const FunctionDecl *KernelCallerFunc,
 
   MC.mangleTypeName(KernelNameType, Out);
   std::string MangledName(Out.str());
-  if(llvm::SYCLHostCompilation)
-    fixManglingForHostCompilation(MangledName);
 
-  return {MangledName, SYCLUniqueStableNameExpr::ComputeName(
-                                      S.getASTContext(), KernelNameType)};
+  std::string StableName = SYCLUniqueStableNameExpr::ComputeName(
+    S.getASTContext(), KernelNameType);
+
+// When compiling for the SYCLNativeCPU device we need a C++ identifier
+// as the kernel name and cannot use the name produced by some manglers
+// including the MS mangler.
+  if (llvm::SYCLHostCompilation) {
+    MangledName = StableName;
+    fixManglingForHostCompilation(MangledName);
+  }
+
+  return {MangledName, StableName};
 }
 
 static bool isDefaultSPIRArch(ASTContext &Context) {
@@ -5234,14 +5247,15 @@ void SYCLIntegrationHeader::emit(raw_ostream &O) {
     O << K.Name << "subhandler";
   };
   if (llvm::SYCLHostCompilation) {
-    O << "// Kernel subhandlers definition for host compilation.\n";
-    for (auto &Desc : KernelDescs) {
-      O << "extern \"C\" void ";
-      printSubHandler(O, Desc);
-      O << "( ";
-      O << "const std::vector<sycl::detail::HostCompilationArgDesc>& MArgs, "
-           "_hc_state*);\n";
-    }
+    // This is a temporary workaround for the integration header file
+    // being emitted too early.
+    extern std::string getHCHeaderName(const LangOptions& LangOpts);
+    std::string HCName = getHCHeaderName(S.getLangOpts());
+
+    O << "\n// including the kernel handlers calling the kernels\n";
+    O << "\n#include \"";
+    O << HCName;
+    O << "\"\n\n";
   }
 
   O << "// array representing signatures of all kernels defined in the\n";
@@ -5294,7 +5308,7 @@ void SYCLIntegrationHeader::emit(raw_ostream &O) {
       << llvm::SYCLHostCompilation << ";\n";
 
     if (llvm::SYCLHostCompilation) {
-      O << "  static void HCKernelHandler(const "
+      O << "  static inline void HCKernelHandler(const "
            "std::vector<sycl::detail::HostCompilationArgDesc>& MArgs, "
            "_hc_state* s) {\n";
       O << "    ";
