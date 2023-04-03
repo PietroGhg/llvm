@@ -330,8 +330,7 @@ void SYCL::Linker::ConstructJob(Compilation &C, const JobAction &JA,
 
   assert((getToolChain().getTriple().isSPIR() ||
           getToolChain().getTriple().isNVPTX() ||
-          getToolChain().getTriple().isAMDGCN() ||
-          isSYCLHostCompilation(Args)) &&
+          getToolChain().getTriple().isAMDGCN() || isSYCLNativeCPU(Args)) &&
          "Unsupported target");
 
   std::string SubArchName =
@@ -806,7 +805,7 @@ void SYCL::x86_64::BackendCompiler::ConstructJob(
 SYCLToolChain::SYCLToolChain(const Driver &D, const llvm::Triple &Triple,
                              const ToolChain &HostTC, const ArgList &Args)
     : ToolChain(D, Triple, Args), HostTC(HostTC),
-      IsSYCLHostCompilation(isSYCLHostCompilation(Args)) {
+      IsSYCLNativeCPU(isSYCLNativeCPU(Args)) {
   // Lookup binaries into the driver directory, this is used to
   // discover the clang-offload-bundler executable.
   getProgramPaths().push_back(getDriver().Dir);
@@ -1069,8 +1068,7 @@ Tool *SYCLToolChain::buildBackendCompiler() const {
 
 Tool *SYCLToolChain::buildLinker() const {
   assert(getTriple().getArch() == llvm::Triple::spir ||
-         getTriple().getArch() == llvm::Triple::spir64 ||
-         IsSYCLHostCompilation);
+         getTriple().getArch() == llvm::Triple::spir64 || IsSYCLNativeCPU);
   return new tools::SYCL::Linker(*this);
 }
 

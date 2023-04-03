@@ -16,7 +16,7 @@
 #include <sycl/detail/cl.h>
 #include <sycl/detail/export.hpp>
 #include <sycl/detail/handler_proxy.hpp>
-#include <sycl/detail/host_compilation.hpp>
+#include <sycl/detail/native_cpu.hpp>
 #include <sycl/detail/os_util.hpp>
 #include <sycl/event.hpp>
 #include <sycl/ext/oneapi/device_global/device_global.hpp>
@@ -277,8 +277,8 @@ private:
 using sycl::detail::enable_if_t;
 using sycl::detail::queue_impl;
 
-__SYCL_EXPORT void setHostCompilationImpl(std::shared_ptr<handler_impl> &MImpl,
-                                          std::shared_ptr<HCTask_t> &task);
+__SYCL_EXPORT void setNativeCPUImpl(std::shared_ptr<handler_impl> &MImpl,
+                                    std::shared_ptr<NativeCPUTask_t> &task);
 } // namespace detail
 
 /// Command group handler class.
@@ -718,23 +718,23 @@ private:
     if (IsCallableWithKernelHandler) {
       getOrInsertHandlerKernelBundle(/*Insert=*/true);
     }
-    if constexpr (detail::IsHostCompilation<KI>::value) {
-      auto l = std::make_shared<detail::HCTask_t>(
+    if constexpr (detail::IsNativeCPU<KI>::value) {
+      auto l = std::make_shared<detail::NativeCPUTask_t>(
           [MArgs = this->MArgs](detail::NDRDescT ndr) {
             _hc_state state;
-            auto HCArgs = detail::processArgsForHostCompilation(MArgs);
+            auto HCArgs = detail::processArgsForNativeCPU(MArgs);
             for (unsigned dim0 = 0; dim0 < ndr.GlobalSize[0]; dim0++) {
               for (unsigned dim1 = 0; dim1 < ndr.GlobalSize[1]; dim1++) {
                 for (unsigned dim2 = 0; dim2 < ndr.GlobalSize[2]; dim2++) {
                   state.MGlobal_id[0] = dim0;
                   state.MGlobal_id[1] = dim1;
                   state.MGlobal_id[2] = dim2;
-                  KI::HCKernelHandler(HCArgs, &state);
+                  KI::NCPUKernelHandler(HCArgs, &state);
                 }
               }
             }
           });
-      detail::setHostCompilationImpl(MImpl, l);
+      detail::setNativeCPUImpl(MImpl, l);
     }
   }
 

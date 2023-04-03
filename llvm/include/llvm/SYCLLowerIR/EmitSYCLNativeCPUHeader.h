@@ -22,16 +22,18 @@ namespace llvm {
 
 class ModulePass;
 
-class EmitSYCLHCHeaderPass : public PassInfoMixin<EmitSYCLHCHeaderPass> {
+class EmitSYCLNativeCPUHeaderPass
+    : public PassInfoMixin<EmitSYCLNativeCPUHeaderPass> {
 public:
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM);
-  EmitSYCLHCHeaderPass(const std::string &FileName) : HCHeaderName(FileName) {}
-  EmitSYCLHCHeaderPass() = default;
+  EmitSYCLNativeCPUHeaderPass(const std::string &FileName)
+      : NativeCPUHeaderName(FileName) {}
+  EmitSYCLNativeCPUHeaderPass() = default;
 
 private:
-  std::string HCHeaderName;
+  std::string NativeCPUHeaderName;
 };
 
-ModulePass *createEmitSYCLHCHeaderLegacyPass();
+ModulePass *createEmitSYCLNativeCPUHeaderLegacyPass();
 
 } // namespace llvm

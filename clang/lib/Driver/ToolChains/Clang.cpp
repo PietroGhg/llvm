@@ -4897,9 +4897,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   bool IsFPGASYCLOffloadDevice =
       IsSYCLOffloadDevice &&
       Triple.getSubArch() == llvm::Triple::SPIRSubArch_fpga;
-  bool IsSYCLHostCompilation =
-      Args.hasFlag(options::OPT_fsycl_host_compilation,
-                   options::OPT_fno_sycl_host_compilation, false);
+  bool IsSYCLNativeCPU = isSYCLNativeCPU(Args);
 
   // Perform the SYCL host compilation using an external compiler if the user
   // requested.
@@ -5030,17 +5028,17 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
                       options::OPT_fno_sycl_early_optimizations,
                       !IsFPGASYCLOffloadDevice))
       CmdArgs.push_back("-fno-sycl-early-optimizations");
-    else if (RawTriple.isSPIR() || IsSYCLHostCompilation) {
+    else if (RawTriple.isSPIR() || IsSYCLNativeCPU) {
       // Set `sycl-opt` option to configure LLVM passes for SPIR target
       CmdArgs.push_back("-mllvm");
       CmdArgs.push_back("-sycl-opt");
     }
-    if (IsSYCLHostCompilation) {
+    if (IsSYCLNativeCPU) {
       CmdArgs.push_back("-mllvm");
-      CmdArgs.push_back("-sycl-host-compilation");
+      CmdArgs.push_back("-sycl-native-cpu");
       CmdArgs.push_back("-D");
-      CmdArgs.push_back("__SYCL_HOST_COMPILATION__");
-      CmdArgs.push_back("-fsycl-hc-header");
+      CmdArgs.push_back("__SYCL_NATIVE_CPU__");
+      CmdArgs.push_back("-fsycl-native-cpu-header");
       CmdArgs.push_back(
           Args.MakeArgString(D.getHCHelperHeader(Input.getBaseInput())));
     }
@@ -5222,7 +5220,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
       // Let the FE know we are doing a SYCL offload compilation, but we are
       // doing the host pass.
       CmdArgs.push_back("-fsycl-is-host");
-      if (IsSYCLHostCompilation) {
+      if (IsSYCLNativeCPU) {
         CmdArgs.push_back("-include");
         CmdArgs.push_back(
             Args.MakeArgString(D.getHCHelperHeader(Input.getBaseInput())));
@@ -5352,7 +5350,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
         CmdArgs.push_back("-fdirectives-only");
     }
   } else if (isa<AssembleJobAction>(JA)) {
-    if (IsSYCLOffloadDevice && !IsSYCLHostCompilation) {
+    if (IsSYCLOffloadDevice && !IsSYCLNativeCPU) {
       CmdArgs.push_back("-emit-llvm-bc");
     } else {
       CmdArgs.push_back("-emit-obj");

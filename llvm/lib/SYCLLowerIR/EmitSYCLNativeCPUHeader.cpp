@@ -1,4 +1,4 @@
-//===------ EmitSYCLHCHeader.cpp - Emit SYCL Host Compilation Header
+//===------ EmitSYCLHCHeader.cpp - Emit SYCL Native CPU Helper Header
 // Pass ------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -7,12 +7,13 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Prepares the kernel for SYCL Host Compilation:
-// * Emits Host Compilation header.
+// Emits the SYCL Native CPU helper headers, containing the kernel definition
+// and handlers.
 //===----------------------------------------------------------------------===//
 
-#include "llvm/SYCLLowerIR/EmitSYCLHCHeader.h"
+#include "llvm/SYCLLowerIR/EmitSYCLNativeCPUHeader.h"
 
+#include "llvm/ADT/StringRef.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
@@ -20,6 +21,7 @@
 #include "llvm/InitializePasses.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
@@ -31,15 +33,17 @@ using namespace llvm;
 
 namespace {
 // Wrapper for the pass to make it working with the old pass manager
-class EmitSYCLHCHeaderLegacyPass : public ModulePass {
+class EmitSYCLNativeCPUHeaderLegacyPass : public ModulePass {
 public:
   static char ID;
-  EmitSYCLHCHeaderLegacyPass() : ModulePass(ID) {
-    initializeEmitSYCLHCHeaderLegacyPassPass(*PassRegistry::getPassRegistry());
+  EmitSYCLNativeCPUHeaderLegacyPass() : ModulePass(ID) {
+    initializeEmitSYCLNativeCPUHeaderLegacyPassPass(
+        *PassRegistry::getPassRegistry());
   }
-  EmitSYCLHCHeaderLegacyPass(const std::string &FileName)
+  EmitSYCLNativeCPUHeaderLegacyPass(const std::string &FileName)
       : ModulePass(ID), Impl(FileName) {
-    initializeEmitSYCLHCHeaderLegacyPassPass(*PassRegistry::getPassRegistry());
+    initializeEmitSYCLNativeCPUHeaderLegacyPassPass(
+        *PassRegistry::getPassRegistry());
   }
 
   bool runOnModule(Module &M) override {
@@ -49,19 +53,20 @@ public:
   }
 
 private:
-  EmitSYCLHCHeaderPass Impl;
-  std::string HCHeaderName;
+  EmitSYCLNativeCPUHeaderPass Impl;
+  std::string NativeCPUHeaderName;
 };
 
 } // namespace
 
-char EmitSYCLHCHeaderLegacyPass::ID = 0;
-INITIALIZE_PASS(EmitSYCLHCHeaderLegacyPass, "emit-sycl-hc-header",
-                "Emit SYCL Host Compilation Header", false, false)
+char EmitSYCLNativeCPUHeaderLegacyPass::ID = 0;
+INITIALIZE_PASS(EmitSYCLNativeCPUHeaderLegacyPass,
+                "emit-sycl-native-cpu-header",
+                "Emit SYCL Native CPU Helper Header", false, false)
 
 // Public interface to the SYCLMutatePrintfAddrspacePass.
-ModulePass *llvm::createEmitSYCLHCHeaderLegacyPass() {
-  return new EmitSYCLHCHeaderLegacyPass();
+ModulePass *llvm::createEmitSYCLNativeCPUHeaderLegacyPass() {
+  return new EmitSYCLNativeCPUHeaderLegacyPass();
 }
 
 namespace {
@@ -93,7 +98,7 @@ SmallVector<StringRef> getArgTypeNames(const Function *F) {
   SmallVector<StringRef> Res;
   auto *TNNode = F->getMetadata("kernel_arg_type");
   assert(TNNode &&
-         "kernel_arg_type metadata node is required for sycl host compilation");
+         "kernel_arg_type metadata node is required for sycl native CPU");
   auto NumOperands = TNNode->getNumOperands();
   for (unsigned I = 0; I < NumOperands; I++) {
     auto &Op = TNNode->getOperand(I);
@@ -154,7 +159,7 @@ void emitSubKernelHandler(const Function *F, const SmallVector<bool> &argMask,
   };
 
   O << "\ninline static void " << F->getName() << "subhandler(";
-  O << "const std::vector<sycl::detail::HostCompilationArgDesc>& MArgs, "
+  O << "const std::vector<sycl::detail::NativeCPUArgDesc>& MArgs, "
        "_hc_state *state) {\n";
   // Retrieve only the args that are used
   for (unsigned I = 0, UsedI = 0;
@@ -182,8 +187,8 @@ void emitSubKernelHandler(const Function *F, const SmallVector<bool> &argMask,
 
 } // namespace
 
-PreservedAnalyses EmitSYCLHCHeaderPass::run(Module &M,
-                                            ModuleAnalysisManager &MAM) {
+PreservedAnalyses EmitSYCLNativeCPUHeaderPass::run(Module &M,
+                                                   ModuleAnalysisManager &MAM) {
   bool ModuleChanged = false;
   SmallVector<Function *> Kernels;
   for (auto &F : M) {
@@ -191,26 +196,19 @@ PreservedAnalyses EmitSYCLHCHeaderPass::run(Module &M,
       Kernels.push_back(&F);
   }
 
-  // Emit host compilation helper header
-  if (HCHeaderName == "") {
-    llvm::errs() << "Please provide a valid file name for the host compilation "
-                    "header.\nExiting\n";
-    // TODO(Pietro) terminate more nicely or (better) find a better way to
-    // handle the file name
-    exit(1);
+  // Emit native CPU helper header
+  if (NativeCPUHeaderName == "") {
+    report_fatal_error("No file name for Native CPU helper header specified");
   }
   int HCHeaderFD = 0;
   std::error_code EC =
-      llvm::sys::fs::openFileForWrite(HCHeaderName, HCHeaderFD);
+      llvm::sys::fs::openFileForWrite(NativeCPUHeaderName, HCHeaderFD);
   if (EC) {
-    llvm::errs() << "Error: " << EC.message() << "\n";
-    // TODO(Pietro) terminate more nicely or (better) find a better way to
-    // handle the file name
-    exit(1);
+    report_fatal_error(StringRef(EC.message()));
   }
   llvm::raw_fd_ostream O(HCHeaderFD, true);
   O << "#pragma once\n";
-  O << "#include <sycl/detail/host_compilation.hpp>\n";
+  O << "#include <sycl/detail/native_cpu.hpp>\n";
 
   for (auto F : Kernels) {
     auto argMask = getArgMask(F);

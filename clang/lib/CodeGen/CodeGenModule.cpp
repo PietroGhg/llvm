@@ -80,7 +80,7 @@ static llvm::cl::opt<bool> LimitedCoverage(
     llvm::cl::desc("Emit limited coverage mapping information (experimental)"));
 
 namespace llvm {
-extern cl::opt<bool> SYCLHostCompilation;
+extern cl::opt<bool> SYCLNativeCPU;
 }
 
 static const char AnnotationSection[] = "llvm.metadata";
@@ -2074,7 +2074,7 @@ void CodeGenModule::GenKernelArgMetadata(llvm::Function *Fn,
       Fn->setMetadata("kernel_arg_exclusive_ptr",
                       llvm::MDNode::get(VMContext, argSYCLAccessorPtrs));
     }
-    if (llvm::SYCLHostCompilation) {
+    if (llvm::SYCLNativeCPU) {
       Fn->setMetadata("kernel_arg_type",
                       llvm::MDNode::get(VMContext, argTypeNames));
     }

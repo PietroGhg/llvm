@@ -52,6 +52,7 @@
 #include "ToolChains/WebAssembly.h"
 #include "ToolChains/XCore.h"
 #include "ToolChains/ZOS.h"
+#include "clang/Basic/DiagnosticDriver.h"
 #include "clang/Basic/TargetID.h"
 #include "clang/Basic/Version.h"
 #include "clang/Config/config.h"
@@ -101,9 +102,9 @@
 #include <cstdlib> // ::getenv
 #include <map>
 #include <memory>
+#include <optional>
 #include <regex>
 #include <sstream>
-#include <optional>
 #include <utility>
 #if LLVM_ON_UNIX
 #include <unistd.h> // getpid
@@ -1138,11 +1139,11 @@ void Driver::CreateOffloadingDeviceToolChains(Compilation &C,
       Diag(clang::diag::err_drv_invalid_sycl_target) << Val;
   }
   bool HasSYCLTargetsOption = SYCLTargets || SYCLLinkTargets || SYCLAddTargets;
-  bool IsSYCLHostCompilation = isSYCLHostCompilation(C.getInputArgs());
+  bool IsSYCLNativeCPU = isSYCLNativeCPU(C.getInputArgs());
 
   llvm::StringMap<StringRef> FoundNormalizedTriples;
   llvm::SmallVector<llvm::Triple, 4> UniqueSYCLTriplesVec;
-  if (!IsSYCLHostCompilation && HasSYCLTargetsOption) {
+  if (!IsSYCLNativeCPU && HasSYCLTargetsOption) {
     // At this point, we know we have a valid combination
     // of -fsycl*target options passed
     Arg *SYCLTargetsValues = SYCLTargets ? SYCLTargets : SYCLLinkTargets;
@@ -1266,7 +1267,7 @@ void Driver::CreateOffloadingDeviceToolChains(Compilation &C,
         Diag(clang::diag::warn_drv_empty_joined_argument)
             << SYCLAddTargets->getAsString(C.getInputArgs());
     }
-  } else if (IsSYCLHostCompilation) {
+  } else if (IsSYCLNativeCPU) {
     const ToolChain *HostTC = C.getSingleOffloadToolChain<Action::OFK_Host>();
     llvm::Triple HostTriple = HostTC->getTriple();
     UniqueSYCLTriplesVec.push_back(HostTriple);
@@ -5674,8 +5675,8 @@ class OffloadingActionBuilder final {
           } else
             FullDeviceLinkAction = FullLinkObject;
 
-          bool IsSYCLHostCompilation = isSYCLHostCompilation(Args);
-          if (IsSYCLHostCompilation) {
+          bool IsSYCLNativeCPU = isSYCLNativeCPU(Args);
+          if (IsSYCLNativeCPU) {
             // for SYCL host compilation, we just take the linked device
             // modules, lower them to a shared lib, and it to the host shared
             // lib.
@@ -6055,11 +6056,11 @@ class OffloadingActionBuilder final {
       bool GpuInitHasErrors = false;
       bool HasSYCLTargetsOption =
           SYCLAddTargets || SYCLTargets || SYCLLinkTargets;
-      bool IsSYCLHostCompilation = isSYCLHostCompilation(C.getInputArgs());
-      if (IsSYCLHostCompilation && HasSYCLTargetsOption) {
-        C.getDriver().Diag(clang::diag::warn_drv_sycl_host_comp_and_targets);
+      bool IsSYCLNativeCPU = isSYCLNativeCPU(C.getInputArgs());
+      if (IsSYCLNativeCPU && HasSYCLTargetsOption) {
+        C.getDriver().Diag(clang::diag::warn_drv_sycl_native_cpu_and_targets);
       }
-      if (!IsSYCLHostCompilation && HasSYCLTargetsOption) {
+      if (!IsSYCLNativeCPU && HasSYCLTargetsOption) {
         if (SYCLTargets || SYCLLinkTargets) {
           Arg *SYCLTargetsValues = SYCLTargets ? SYCLTargets : SYCLLinkTargets;
           // Fill SYCLTripleList
@@ -6179,7 +6180,7 @@ class OffloadingActionBuilder final {
               GpuArchList.emplace_back(TT, nullptr);
           }
         }
-      } else if (IsSYCLHostCompilation) {
+      } else if (IsSYCLNativeCPU) {
         const ToolChain *HostTC =
             C.getSingleOffloadToolChain<Action::OFK_Host>();
         llvm::Triple TT = HostTC->getTriple();
@@ -7002,7 +7003,7 @@ void Driver::BuildActions(Compilation &C, DerivedArgList &Args,
         TmpFileFooter = C.addTempFile(C.getArgs().MakeArgString(OutName));
       }
       addIntegrationFiles(TmpFileHeader, TmpFileFooter, SrcFileName);
-      if (isSYCLHostCompilation(Args)) {
+      if (isSYCLNativeCPU(Args)) {
         std::string TmpFileNameHCHeader;
         if (IsSaveTemps) {
           TmpFileNameHCHeader.append(C.getDriver().GetUniquePath(
@@ -7014,7 +7015,7 @@ void Driver::BuildActions(Compilation &C, DerivedArgList &Args,
 
         StringRef TmpHCHeader =
             C.addTempFile(C.getArgs().MakeArgString(TmpFileNameHCHeader));
-        addIntegrationHCHeader(TmpHCHeader, SrcFileName);
+        addIntegrationNativeCPUHeader(TmpHCHeader, SrcFileName);
       }
     }
   }
@@ -9602,7 +9603,7 @@ const ToolChain &Driver::getToolChain(const ArgList &Args,
 const ToolChain &Driver::getOffloadingDeviceToolChain(const ArgList &Args,
                   const llvm::Triple &Target, const ToolChain &HostTC,
                   const Action::OffloadKind &TargetDeviceOffloadKind) const {
-  bool IsSYCLHostCompilation = isSYCLHostCompilation(Args);
+  bool IsSYCLNativeCPU = isSYCLNativeCPU(Args);
   // Use device / host triples offload kind as the key into the ToolChains map
   // because the device ToolChain we create depends on both.
   auto &TC = ToolChains[Target.str() + "/" + HostTC.getTriple().str() +
@@ -9651,7 +9652,7 @@ const ToolChain &Driver::getOffloadingDeviceToolChain(const ArgList &Args,
                 *this, Target, HostTC, Args, TargetDeviceOffloadKind);
             break;
           default:
-            if (IsSYCLHostCompilation) {
+            if (IsSYCLNativeCPU) {
               TC = std::make_unique<toolchains::SYCLToolChain>(*this, Target,
                                                                HostTC, Args);
             }

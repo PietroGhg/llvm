@@ -46,10 +46,10 @@
 #include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/SYCLLowerIR/CompileTimePropertiesPass.h"
 #include "llvm/SYCLLowerIR/ESIMD/ESIMDVerifier.h"
-#include "llvm/SYCLLowerIR/EmitSYCLHCHeader.h"
+#include "llvm/SYCLLowerIR/EmitSYCLNativeCPUHeader.h"
 #include "llvm/SYCLLowerIR/LowerWGLocalMemory.h"
 #include "llvm/SYCLLowerIR/MutatePrintfAddrspace.h"
-#include "llvm/SYCLLowerIR/PrepareSYCLHostCompilation.h"
+#include "llvm/SYCLLowerIR/PrepareSYCLNativeCPU.h"
 #include "llvm/SYCLLowerIR/SYCLPropagateAspectsUsage.h"
 #include "llvm/Support/BuryPointer.h"
 #include "llvm/Support/CommandLine.h"
@@ -62,8 +62,8 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
-#include "llvm/Transforms/IPO/DeadArgumentElimination.h"
 #include "llvm/TargetParser/Triple.h"
+#include "llvm/Transforms/IPO/DeadArgumentElimination.h"
 #include "llvm/Transforms/IPO/LowerTypeTests.h"
 #include "llvm/Transforms/IPO/ThinLTOBitcodeWriter.h"
 #include "llvm/Transforms/InstCombine/InstCombine.h"
@@ -101,7 +101,7 @@ using namespace llvm;
 
 namespace llvm {
 extern cl::opt<bool> DebugInfoCorrelate;
-extern cl::opt<bool> SYCLHostCompilation;
+extern cl::opt<bool> SYCLNativeCPU;
 
 // Experiment to move sanitizers earlier.
 static cl::opt<bool> ClSanitizeOnOptimizerEarlyEP(
@@ -765,12 +765,14 @@ static void addSanitizers(const Triple &TargetTriple,
 
 // Uwe todo: find better place for this function, if we need it
 // at all. Currently also used by SemaSYCL
-std::string getHCHeaderName(const LangOptions& LangOpts) {
-  std::string HCName = LangOpts.SYCLHCHeader;
+namespace clang {
+std::string getNativeCPUHeaderName(const LangOptions &LangOpts) {
+  std::string HCName = LangOpts.SYCLNativeCPUHeader;
   if (HCName == "")
     HCName = LangOpts.SYCLIntHeader + ".hc";
   return HCName;
 }
+} // namespace clang
 
 void EmitAssemblyHelper::RunOptimizationPipeline(
     BackendAction Action, std::unique_ptr<raw_pwrite_stream> &OS,
@@ -1061,9 +1063,10 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
       MPM.addPass(CompileTimePropertiesPass());
     }
 
-    if (LangOpts.SYCLIsDevice && llvm::SYCLHostCompilation) {
-      MPM.addPass(EmitSYCLHCHeaderPass(getHCHeaderName(LangOpts)));
-      MPM.addPass(PrepareSYCLHostCompilationPass());
+    if (LangOpts.SYCLIsDevice && llvm::SYCLNativeCPU) {
+      MPM.addPass(
+          EmitSYCLNativeCPUHeaderPass(getNativeCPUHeaderName(LangOpts)));
+      MPM.addPass(PrepareSYCLNativeCPUPass());
     }
   }
 

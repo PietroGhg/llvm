@@ -7,47 +7,46 @@ namespace sycl {
 __SYCL_INLINE_VER_NAMESPACE(_V1) {
 namespace detail {
 
-using HCTask_t = std::function<void(NDRDescT)>;
+using NativeCPUTask_t = std::function<void(NDRDescT)>;
 
-class HCTask : public HostKernelBase {
+class NativeCPUTask : public HostKernelBase {
 public:
-  HCTask(std::shared_ptr<HCTask_t> Task) : MTask(Task) {}
+  NativeCPUTask(std::shared_ptr<NativeCPUTask_t> Task) : MTask(Task) {}
   void call(const NDRDescT &NDRDesc, HostProfilingInfo *HPI) override {
     (*MTask)(NDRDesc);
   }
   // Return pointer to the lambda object.
   // Used to extract captured variables.
   char *getPtr() override {
-    assert(false && "getPtr called on Host Compilation task");
+    assert(false && "getPtr called on Native CPU task");
     return nullptr;
   }
 
 private:
-  std::shared_ptr<HCTask_t> MTask;
+  std::shared_ptr<NativeCPUTask_t> MTask;
 };
 
-class __SYCL_EXPORT HostCompilationArgDesc {
+class __SYCL_EXPORT NativeCPUArgDesc {
   void *MPtr;
 
 public:
   void *getPtr() const { return MPtr; }
-  HostCompilationArgDesc(const ArgDesc &ArgDesc);
+  NativeCPUArgDesc(const ArgDesc &ArgDesc);
 };
 
 __SYCL_EXPORT
-std::vector<HostCompilationArgDesc>
-processArgsForHostCompilation(const std::vector<ArgDesc> &MArgs);
+std::vector<NativeCPUArgDesc>
+processArgsForNativeCPU(const std::vector<ArgDesc> &MArgs);
 
 // Helper class to determine wheter or not the KernelInfo struct has
-// the is_host_compilation field, and if it is true or false.
-template <typename T, class Enable = void> struct IsHostCompilation {
+// the is_native_cpu field, and if it is true or false.
+template <typename T, class Enable = void> struct IsNativeCPU {
   static constexpr bool value = false;
 };
 
 template <typename T>
-struct IsHostCompilation<
-    T, typename std::enable_if<T::is_host_compilation>::type> {
-  static constexpr bool value = T::is_host_compilation;
+struct IsNativeCPU<T, typename std::enable_if<T::is_native_cpu>::type> {
+  static constexpr bool value = T::is_native_cpu;
 };
 
 } // namespace detail
@@ -63,7 +62,7 @@ extern "C" struct _hc_state {
   }
 };
 
-#ifdef __SYCL_HOST_COMPILATION__
+#ifdef __SYCL_NATIVE_CPU__
 #ifdef __SYCL_DEVICE_ONLY__
 #define __SYCL_HC_ATTRS                                                        \
   __attribute__((weak)) __attribute((alwaysinline))                            \

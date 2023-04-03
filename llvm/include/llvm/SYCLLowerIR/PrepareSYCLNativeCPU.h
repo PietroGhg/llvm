@@ -22,12 +22,12 @@ namespace llvm {
 
 class ModulePass;
 
-class PrepareSYCLHostCompilationPass
-    : public PassInfoMixin<PrepareSYCLHostCompilationPass> {
+class PrepareSYCLNativeCPUPass
+    : public PassInfoMixin<PrepareSYCLNativeCPUPass> {
 public:
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM);
 };
 
-ModulePass *createPrepareSYCLHostCompilationLegacyPass();
+ModulePass *createPrepareSYCLNativeCPULegacyPass();
 
 } // namespace llvm

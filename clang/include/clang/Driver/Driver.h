@@ -816,8 +816,8 @@ private:
   mutable llvm::StringMap<const std::pair<StringRef, StringRef>>
       IntegrationFileList;
 
-  /// Integration helper header for SYCL Host Compilation
-  mutable llvm::StringMap<const StringRef> HCIntegrationFiles;
+  /// Integration helper header for SYCL Native CPU
+  mutable llvm::StringMap<const StringRef> NativeCPUIntegrationFiles;
 
   /// Unique ID used for SYCL compilations.  Each file will use a different
   /// unique ID, but the same ID will be used for different compilation
@@ -889,9 +889,9 @@ public:
   }
 
   /// add integration helper header for host compilation
-  void addIntegrationHCHeader(StringRef HCHeaderName,
-                              StringRef FileName) const {
-    HCIntegrationFiles.insert({FileName, HCHeaderName});
+  void addIntegrationNativeCPUHeader(StringRef NativeCPUHeaderName,
+                                     StringRef FileName) const {
+    NativeCPUIntegrationFiles.insert({FileName, NativeCPUHeaderName});
   }
   /// getIntegrationHeader - Get the integration header file
   StringRef getIntegrationHeader(StringRef FileName) const {
@@ -903,7 +903,7 @@ public:
   }
   /// getHCHelperHeader - Get the helper header for SYCL Host Compilation
   StringRef getHCHelperHeader(StringRef FileName) const {
-    return HCIntegrationFiles[FileName];
+    return NativeCPUIntegrationFiles[FileName];
   }
   /// createAppendedFooterInput - Create new source file.
   void createAppendedFooterInput(Action *&Input, Compilation &C,

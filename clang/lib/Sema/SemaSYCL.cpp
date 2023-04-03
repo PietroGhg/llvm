@@ -37,8 +37,8 @@
 #include <regex>
 
 namespace llvm {
-cl::opt<bool> SYCLHostCompilation("sycl-host-compilation", cl::init(false),
-                                  cl::desc("Enable SYCL host compilation"));
+cl::opt<bool> SYCLNativeCPU("sycl-native-cpu", cl::init(false),
+                            cl::desc("Enable SYCL Native CPU"));
 }
 
 using namespace clang;
@@ -1039,8 +1039,8 @@ static QualType calculateKernelNameType(ASTContext &Ctx,
 // may collide (in the IR) with the "real" type names generated
 // for RTTI etc when compiling host and device code together.
 // Therefore the mangling of the kernel function is changed for
-// HostCompilation to avoid such potential collision.
-static void fixManglingForHostCompilation(std::string& Name){
+// NativeCPU to avoid such potential collision.
+static void fixManglingForNativeCPU(std::string &Name) {
   const std::string Target("_ZTS");
   const size_t Pos = Name.find(Target);
   if(Pos == std::string::npos)
@@ -1062,15 +1062,15 @@ constructKernelName(Sema &S, const FunctionDecl *KernelCallerFunc,
   MC.mangleTypeName(KernelNameType, Out);
   std::string MangledName(Out.str());
 
-  std::string StableName = SYCLUniqueStableNameExpr::ComputeName(
-    S.getASTContext(), KernelNameType);
+  std::string StableName =
+      SYCLUniqueStableNameExpr::ComputeName(S.getASTContext(), KernelNameType);
 
-// When compiling for the SYCLNativeCPU device we need a C++ identifier
-// as the kernel name and cannot use the name produced by some manglers
-// including the MS mangler.
-  if (llvm::SYCLHostCompilation) {
+  // When compiling for the SYCLNativeCPU device we need a C++ identifier
+  // as the kernel name and cannot use the name produced by some manglers
+  // including the MS mangler.
+  if (llvm::SYCLNativeCPU) {
     MangledName = StableName;
-    fixManglingForHostCompilation(MangledName);
+    fixManglingForNativeCPU(MangledName);
   }
 
   return {MangledName, StableName};
@@ -5112,8 +5112,8 @@ void SYCLIntegrationHeader::emit(raw_ostream &O) {
   O << "#include <sycl/detail/defines_elementary.hpp>\n";
   O << "#include <sycl/detail/kernel_desc.hpp>\n";
 
-  if (llvm::SYCLHostCompilation) {
-    O << "#include <sycl/detail/host_compilation.hpp>\n";
+  if (llvm::SYCLNativeCPU) {
+    O << "#include <sycl/detail/native_cpu.hpp>\n";
     O << "#include <iostream>\n";
     O << "#include <vector>\n";
   }
@@ -5246,11 +5246,11 @@ void SYCLIntegrationHeader::emit(raw_ostream &O) {
   auto printSubHandler = [](raw_ostream &O, const KernelDesc &K) {
     O << K.Name << "subhandler";
   };
-  if (llvm::SYCLHostCompilation) {
+  if (llvm::SYCLNativeCPU) {
     // This is a temporary workaround for the integration header file
     // being emitted too early.
-    extern std::string getHCHeaderName(const LangOptions& LangOpts);
-    std::string HCName = getHCHeaderName(S.getLangOpts());
+    extern std::string getNativeCPUHeaderName(const LangOptions &LangOpts);
+    std::string HCName = getNativeCPUHeaderName(S.getLangOpts());
 
     O << "\n// including the kernel handlers calling the kernels\n";
     O << "\n#include \"";
@@ -5304,12 +5304,12 @@ void SYCLIntegrationHeader::emit(raw_ostream &O) {
       Printer.Visit(K.NameType);
       O << "> {\n";
     }
-    O << "  static constexpr bool is_host_compilation = "
-      << llvm::SYCLHostCompilation << ";\n";
+    O << "  static constexpr bool is_native_cpu = " << llvm::SYCLNativeCPU
+      << ";\n";
 
-    if (llvm::SYCLHostCompilation) {
-      O << "  static inline void HCKernelHandler(const "
-           "std::vector<sycl::detail::HostCompilationArgDesc>& MArgs, "
+    if (llvm::SYCLNativeCPU) {
+      O << "  static inline void NCPUKernelHandler(const "
+           "std::vector<sycl::detail::NativeCPUArgDesc>& MArgs, "
            "_hc_state* s) {\n";
       O << "    ";
       printSubHandler(O, K);

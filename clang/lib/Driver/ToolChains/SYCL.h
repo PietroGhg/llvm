@@ -199,7 +199,7 @@ protected:
   Tool *buildLinker() const override;
 
 private:
-  bool IsSYCLHostCompilation;
+  bool IsSYCLNativeCPU;
   void TranslateTargetOpt(const llvm::opt::ArgList &Args,
                           llvm::opt::ArgStringList &CmdArgs,
                           llvm::opt::OptSpecifier Opt,
@@ -212,9 +212,9 @@ private:
 
 } // end namespace toolchains
 
-template <typename ArgListT> bool isSYCLHostCompilation(const ArgListT &Args) {
-  return Args.hasFlag(options::OPT_fsycl_host_compilation,
-                      options::OPT_fno_sycl_host_compilation, false);
+template <typename ArgListT> bool isSYCLNativeCPU(const ArgListT &Args) {
+  return Args.hasFlag(options::OPT_fsycl_native_cpu,
+                      options::OPT_fno_sycl_native_cpu, false);
 }
 } // end namespace driver
 } // end namespace clang

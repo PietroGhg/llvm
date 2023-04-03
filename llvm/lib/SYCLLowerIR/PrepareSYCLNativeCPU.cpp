@@ -12,7 +12,7 @@
 // * Materializes spirv buitlins.
 //===----------------------------------------------------------------------===//
 
-#include "llvm/SYCLLowerIR/PrepareSYCLHostCompilation.h"
+#include "llvm/SYCLLowerIR/PrepareSYCLNativeCPU.h"
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/Constants.h"
@@ -35,15 +35,14 @@ using namespace llvm;
 
 namespace {
 // Wrapper for the pass to make it working with the old pass manager
-class PrepareSYCLHostCompilationLegacyPass : public ModulePass {
+class PrepareSYCLNativeCPULegacyPass : public ModulePass {
 public:
   static char ID;
-  PrepareSYCLHostCompilationLegacyPass() : ModulePass(ID) {
-    initializePrepareSYCLHostCompilationLegacyPassPass(
+  PrepareSYCLNativeCPULegacyPass() : ModulePass(ID) {
+    initializePrepareSYCLNativeCPULegacyPassPass(
         *PassRegistry::getPassRegistry());
   }
 
-  // run the SYCLMutatePrintfAddrspace pass on the specified module
   bool runOnModule(Module &M) override {
     ModuleAnalysisManager MAM;
     auto PA = Impl.run(M, MAM);
@@ -51,18 +50,17 @@ public:
   }
 
 private:
-  PrepareSYCLHostCompilationPass Impl;
+  PrepareSYCLNativeCPUPass Impl;
 };
 
 } // namespace
 
-char PrepareSYCLHostCompilationLegacyPass::ID = 0;
-INITIALIZE_PASS(PrepareSYCLHostCompilationLegacyPass, "prepare-sycl-hc",
+char PrepareSYCLNativeCPULegacyPass::ID = 0;
+INITIALIZE_PASS(PrepareSYCLNativeCPULegacyPass, "prepare-sycl-hc",
                 "Prepare SYCL Kernels for SYCL Host Compilation", false, false)
 
-// Public interface to the SYCLMutatePrintfAddrspacePass.
-ModulePass *llvm::createPrepareSYCLHostCompilationLegacyPass() {
-  return new PrepareSYCLHostCompilationLegacyPass();
+ModulePass *llvm::createPrepareSYCLNativeCPULegacyPass() {
+  return new PrepareSYCLNativeCPULegacyPass();
 }
 
 namespace {
@@ -119,8 +117,8 @@ Value *getStateArg(Function *F) {
 
 } // namespace
 
-PreservedAnalyses
-PrepareSYCLHostCompilationPass::run(Module &M, ModuleAnalysisManager &MAM) {
+PreservedAnalyses PrepareSYCLNativeCPUPass::run(Module &M,
+                                                ModuleAnalysisManager &MAM) {
   bool ModuleChanged = false;
   SmallVector<Function *> OldKernels;
   for (auto &F : M) {
@@ -132,7 +130,9 @@ PrepareSYCLHostCompilationPass::run(Module &M, ModuleAnalysisManager &MAM) {
   // First we add a pointer to the host compilation state as arg to all the
   // kernels.
   Type *StateType = StructType::getTypeByName(M.getContext(), "struct._hc_state");
-  assert(StateType && "Couldn't find the host compilation state in the module, make sure that -D __SYCL_HOST_COMPILATION__ is set");
+  if (!StateType)
+    report_fatal_error("Couldn't find the host compilation state in the "
+                       "module, make sure that -D __SYCL_NATIVE_CPU__ is set");
   Type *StatePtrType = PointerType::getUnqual(StateType);
   SmallVector<Function *> NewKernels;
   for (auto &oldF : OldKernels) {

@@ -1,4 +1,4 @@
-// RUN: %clangxx -fsycl-device-only -fsycl-host-compilation -Xclang -fsycl-int-header=%t.h -Xclang -fsycl-hc-header=%t-hc.h -o %t.bc %s 
+// RUN: %clangxx -fsycl-device-only -fsycl-native-cpu -Xclang -fsycl-int-header=%t.h -Xclang -fsycl-native-cpu-header=%t-hc.h -o %t.bc %s 
 // RUN: FileCheck -input-file=%t.h %s --check-prefix=CHECK-H
 // RUN: FileCheck -input-file=%t-hc.h %s --check-prefix=CHECK-HC
 // Compiling generated main integration header to check correctness, -fsycl option used to find required includes 
@@ -20,17 +20,17 @@ int main() {
 
 
 // CHECK-H: template <> struct KernelInfo<::Test1> {
-// CHECK-H-NEXT:   static constexpr bool is_host_compilation = 1;
-// CHECK-H-NEXT:   static inline void HCKernelHandler(const std::vector<sycl::detail::HostCompilationArgDesc>& MArgs, _hc_state* s) {
+// CHECK-H-NEXT:   static constexpr bool is_native_cpu = 1;
+// CHECK-H-NEXT:   static inline void NCPUKernelHandler(const std::vector<sycl::detail::NativeCPUArgDesc>& MArgs, _hc_state* s) {
 // CHECK-H-NEXT:     _Z5Test1subhandler(MArgs, s);
 // CHECK-H-NEXT:   }
 
 
 
 //CHECK-HC: #pragma once
-//CHECK-HC-NEXT: #include <sycl/detail/host_compilation.hpp>
+//CHECK-HC-NEXT: #include <sycl/detail/native_cpu.hpp>
 //CHECK-HC:extern "C" void _Z5Test1(void *, void *, _hc_state *);
-//CHECK-HC:inline static void _Z5Test1subhandler(const std::vector<sycl::detail::HostCompilationArgDesc>& MArgs, _hc_state *state) {
+//CHECK-HC:inline static void _Z5Test1subhandler(const std::vector<sycl::detail::NativeCPUArgDesc>& MArgs, _hc_state *state) {
 //CHECK-HC-NEXT:  void* arg0 = MArgs[0].getPtr();
 //CHECK-HC-NEXT:  void* arg3 = MArgs[3].getPtr();
 //CHECK-HC-NEXT:  _Z5Test1(arg0, arg3, state);

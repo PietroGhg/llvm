@@ -1,12 +1,12 @@
-//RUN: %clang -fsycl -fsycl-host-compilation -ccc-print-phases %s 2>&1 | FileCheck %s --check-prefix=CHECK_ACTIONS
-//RUN: %clang -fsycl -fsycl-host-compilation -ccc-print-bindings %s 2>&1 | FileCheck %s --check-prefix=CHECK_BINDINGS
-//RUN: %clang -fsycl -fsycl-host-compilation -### %s 2>&1 | FileCheck %s --check-prefix=CHECK_INVO
+//RUN: %clang -fsycl -fsycl-native-cpu -ccc-print-phases %s 2>&1 | FileCheck %s --check-prefix=CHECK_ACTIONS
+//RUN: %clang -fsycl -fsycl-native-cpu -ccc-print-bindings %s 2>&1 | FileCheck %s --check-prefix=CHECK_BINDINGS
+//RUN: %clang -fsycl -fsycl-native-cpu -### %s 2>&1 | FileCheck %s --check-prefix=CHECK_INVO
 
 
-//CHECK_ACTIONS:                     +- 0: input, "{{.*}}sycl-host-compilation-fsycl.cpp", c++, (host-sycl)
+//CHECK_ACTIONS:                     +- 0: input, "{{.*}}sycl-native-cpu-fsycl.cpp", c++, (host-sycl)
 //CHECK_ACTIONS:                  +- 1: append-footer, {0}, c++, (host-sycl)
 //CHECK_ACTIONS:               +- 2: preprocessor, {1}, c++-cpp-output, (host-sycl)
-//CHECK_ACTIONS:               |     +- 3: input, "{{.*}}sycl-host-compilation-fsycl.cpp", c++, (device-sycl)
+//CHECK_ACTIONS:               |     +- 3: input, "{{.*}}sycl-native-cpu-fsycl.cpp", c++, (device-sycl)
 //CHECK_ACTIONS:               |  +- 4: preprocessor, {3}, c++-cpp-output, (device-sycl)
 //CHECK_ACTIONS:               |- 5: compiler, {4}, ir, (device-sycl)
 //CHECK_ACTIONS:            +- 6: offload, "host-sycl (x86_64-unknown-linux-gnu)" {2}, "device-sycl (x86_64-unknown-linux-gnu)" {5}, c++-cpp-output
@@ -21,13 +21,13 @@
 //CHECK_ACTIONS:14: offload, "host-sycl (x86_64-unknown-linux-gnu)" {10}, "device-sycl (x86_64-unknown-linux-gnu)" {13}, image
 
 
-//CHECK_BINDINGS:# "x86_64-unknown-linux-gnu" - "clang", inputs: ["{{.*}}sycl-host-compilation-fsycl.cpp"], output: "[[KERNELIR:.*]].bc"
+//CHECK_BINDINGS:# "x86_64-unknown-linux-gnu" - "clang", inputs: ["{{.*}}sycl-native-cpu-fsycl.cpp"], output: "[[KERNELIR:.*]].bc"
 //CHECK_BINDINGS:# "x86_64-unknown-linux-gnu" - "SYCL::Linker", inputs: ["[[KERNELIR]].bc"], output: "[[KERNELLINK:.*]].bc"
 //CHECK_BINDINGS:# "x86_64-unknown-linux-gnu" - "clang", inputs: ["[[KERNELLINK]].bc"], output: "[[KERNELOBJ:.*]].o"
-//CHECK_BINDINGS:# "x86_64-unknown-linux-gnu" - "Append Footer to source", inputs: ["{{.*}}sycl-host-compilation-fsycl.cpp"], output: "[[SRCWFOOTER:.*]].cpp"
+//CHECK_BINDINGS:# "x86_64-unknown-linux-gnu" - "Append Footer to source", inputs: ["{{.*}}sycl-native-cpu-fsycl.cpp"], output: "[[SRCWFOOTER:.*]].cpp"
 //CHECK_BINDINGS:# "x86_64-unknown-linux-gnu" - "clang", inputs: ["[[SRCWFOOTER]].cpp", "[[KERNELIR]].bc"], output: "[[HOSTOBJ:.*]].o"
 //CHECK_BINDINGS:# "x86_64-unknown-linux-gnu" - "GNU::Linker", inputs: ["[[HOSTOBJ]].o", "[[KERNELOBJ]].o"], output: "a.out"
 
-//CHECK_INVO:{{.*}}clang{{.*}}-fsycl-is-device{{.*}}"-mllvm" "-sycl-host-compilation" "-D" "__SYCL_HOST_COMPILATION__" "-fsycl-hc-header" "[[HCHEADER:[a-z0-9A-Z\/\-]*\.h]]"
+//CHECK_INVO:{{.*}}clang{{.*}}-fsycl-is-device{{.*}}"-mllvm" "-sycl-native-cpu" "-D" "__SYCL_NATIVE_CPU__" "-fsycl-native-cpu-header" "[[HCHEADER:[a-z0-9A-Z\/\-]*\.h]]"
 //CHECK_INVO:{{.*}}clang{{.*}}"-x" "ir"
 //CHECK_INVO:{{.*}}clang{{.*}}"-fsycl-is-host"{{.*}}"-include" "[[HCHEADER]]"

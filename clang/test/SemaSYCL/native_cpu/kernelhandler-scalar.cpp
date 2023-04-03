@@ -1,4 +1,4 @@
-// RUN: %clangxx -fsycl-device-only  -fsycl-host-compilation -Xclang -fsycl-int-header=%t.h -Xclang -fsycl-hc-header=%t-hc.h -o %t.bc %s 
+// RUN: %clangxx -fsycl-device-only  -fsycl-native-cpu -Xclang -fsycl-int-header=%t.h -Xclang -fsycl-native-cpu-header=%t-hc.h -o %t.bc %s 
 // RUN: FileCheck -input-file=%t-hc.h %s 
 // Compiling generated main integration header to check correctness, -fsycl option used to find required includes
 // RUN: %clangxx -fsycl -c -x c++ %t.h
@@ -55,7 +55,7 @@ int main() {
 
 
 // CHECK:extern "C" void _Z6init_aIiE(void *, void *, int, _hc_state *);
-// CHECK:inline static void _Z6init_aIiEsubhandler(const std::vector<sycl::detail::HostCompilationArgDesc>& MArgs, _hc_state *state) {
+// CHECK:inline static void _Z6init_aIiEsubhandler(const std::vector<sycl::detail::NativeCPUArgDesc>& MArgs, _hc_state *state) {
 // CHECK-NEXT:  void* arg0 = MArgs[0].getPtr();
 // CHECK-NEXT:  void* arg3 = MArgs[3].getPtr();
 // CHECK-NEXT:  int arg4 = *(int*)MArgs[4].getPtr();
@@ -63,7 +63,7 @@ int main() {
 // CHECK-NEXT:};
 
 // CHECK:extern "C" void _Z6init_aIjE(void *, void *, unsigned int, _hc_state *);
-// CHECK:inline static void _Z6init_aIjEsubhandler(const std::vector<sycl::detail::HostCompilationArgDesc>& MArgs, _hc_state *state) {
+// CHECK:inline static void _Z6init_aIjEsubhandler(const std::vector<sycl::detail::NativeCPUArgDesc>& MArgs, _hc_state *state) {
 // CHECK-NEXT:  void* arg0 = MArgs[0].getPtr();
 // CHECK-NEXT:  void* arg3 = MArgs[3].getPtr();
 // CHECK-NEXT:  unsigned int arg4 = *(unsigned int*)MArgs[4].getPtr();
@@ -71,7 +71,7 @@ int main() {
 // CHECK-NEXT:};
 
 // CHECK:extern "C" void _Z6init_aIfE(void *, void *, float, _hc_state *);
-// CHECK:inline static void _Z6init_aIfEsubhandler(const std::vector<sycl::detail::HostCompilationArgDesc>& MArgs, _hc_state *state) {
+// CHECK:inline static void _Z6init_aIfEsubhandler(const std::vector<sycl::detail::NativeCPUArgDesc>& MArgs, _hc_state *state) {
 // CHECK-NEXT:  void* arg0 = MArgs[0].getPtr();
 // CHECK-NEXT:  void* arg3 = MArgs[3].getPtr();
 // CHECK-NEXT:  float arg4 = *(float*)MArgs[4].getPtr();
@@ -79,7 +79,7 @@ int main() {
 // CHECK-NEXT:};
 
 // CHECK:extern "C" void _Z6init_aIdE(void *, void *, double, _hc_state *);
-// CHECK:inline static void _Z6init_aIdEsubhandler(const std::vector<sycl::detail::HostCompilationArgDesc>& MArgs, _hc_state *state) {
+// CHECK:inline static void _Z6init_aIdEsubhandler(const std::vector<sycl::detail::NativeCPUArgDesc>& MArgs, _hc_state *state) {
 // CHECK-NEXT:  void* arg0 = MArgs[0].getPtr();
 // CHECK-NEXT:  void* arg3 = MArgs[3].getPtr();
 // CHECK-NEXT:  double arg4 = *(double*)MArgs[4].getPtr();

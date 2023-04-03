@@ -6,6 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "sycl/detail/native_cpu.hpp"
 #include <algorithm>
 
 #include <detail/config.hpp>
@@ -247,9 +248,10 @@ event handler::finalize() {
     // Copy kernel name here instead of move so that it's available after
     // running of this method by reductions implementation. This allows for
     // assert feature to check if kernel uses assertions
-    if (MImpl->MHostCompilationFunct) {
+    if (MImpl->MNativeCPUFunct) {
       // reset the host kernel pointer to the optimized host kernel
-      detail::HCTask *HCTPtr = new detail::HCTask(MImpl->MHostCompilationFunct);
+      detail::NativeCPUTask *HCTPtr =
+          new detail::NativeCPUTask(MImpl->MNativeCPUFunct);
       MHostKernel.reset(HCTPtr);
     }
     CommandGroup.reset(new detail::CGExecKernel(
