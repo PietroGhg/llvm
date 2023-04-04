@@ -8,7 +8,7 @@
 //===----------------------------------------------------------------------===//
 //
 // This pass emits the SYCL Native CPU helper header.
-// The header mainly contatins the definition for the handler function which
+// The header mainly contains the definition for the handler function which
 // allows to call the kernel extracted by the device compiler from the host
 // runtime.
 //===----------------------------------------------------------------------===//
