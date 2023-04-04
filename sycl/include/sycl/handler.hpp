@@ -718,7 +718,7 @@ private:
     if (IsCallableWithKernelHandler) {
       getOrInsertHandlerKernelBundle(/*Insert=*/true);
     }
-    if constexpr (detail::IsNativeCPU<KI>::value) {
+    if constexpr (detail::is_native_cpu_v<KI>) {
       auto l = std::make_shared<detail::NativeCPUTask_t>(
           [MArgs = this->MArgs](detail::NDRDescT ndr) {
             _hc_state state;

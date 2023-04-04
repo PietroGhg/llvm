@@ -40,14 +40,17 @@ processArgsForNativeCPU(const std::vector<ArgDesc> &MArgs);
 
 // Helper class to determine wheter or not the KernelInfo struct has
 // the is_native_cpu field, and if it is true or false.
-template <typename T, class Enable = void> struct IsNativeCPU {
+template <typename T, class Enable = void> struct is_native_cpu {
   static constexpr bool value = false;
 };
 
 template <typename T>
-struct IsNativeCPU<T, typename std::enable_if<T::is_native_cpu>::type> {
+struct is_native_cpu<T, typename std::enable_if_t<T::is_native_cpu>> {
   static constexpr bool value = T::is_native_cpu;
 };
+
+template <typename T>
+inline constexpr bool is_native_cpu_v = is_native_cpu<T>::value;
 
 } // namespace detail
 } // __SYCL_INLINE_VER_NAMESPACE(_V1)
