@@ -31,43 +31,6 @@
 
 using namespace llvm;
 
-namespace {
-// Wrapper for the pass to make it working with the old pass manager
-class EmitSYCLNativeCPUHeaderLegacyPass : public ModulePass {
-public:
-  static char ID;
-  EmitSYCLNativeCPUHeaderLegacyPass() : ModulePass(ID) {
-    initializeEmitSYCLNativeCPUHeaderLegacyPassPass(
-        *PassRegistry::getPassRegistry());
-  }
-  EmitSYCLNativeCPUHeaderLegacyPass(const std::string &FileName)
-      : ModulePass(ID), Impl(FileName) {
-    initializeEmitSYCLNativeCPUHeaderLegacyPassPass(
-        *PassRegistry::getPassRegistry());
-  }
-
-  bool runOnModule(Module &M) override {
-    ModuleAnalysisManager MAM;
-    auto PA = Impl.run(M, MAM);
-    return !PA.areAllPreserved();
-  }
-
-private:
-  EmitSYCLNativeCPUHeaderPass Impl;
-  std::string NativeCPUHeaderName;
-};
-
-} // namespace
-
-char EmitSYCLNativeCPUHeaderLegacyPass::ID = 0;
-INITIALIZE_PASS(EmitSYCLNativeCPUHeaderLegacyPass,
-                "emit-sycl-native-cpu-header",
-                "Emit SYCL Native CPU Helper Header", false, false)
-
-// Public interface to the SYCLMutatePrintfAddrspacePass.
-ModulePass *llvm::createEmitSYCLNativeCPUHeaderLegacyPass() {
-  return new EmitSYCLNativeCPUHeaderLegacyPass();
-}
 
 namespace {
 SmallVector<bool> getArgMask(const Function *F) {

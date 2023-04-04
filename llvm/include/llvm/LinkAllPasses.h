@@ -171,8 +171,6 @@ namespace {
       (void) llvm::createExpandMemCmpPass();
       (void) llvm::createExpandVectorPredicationPass();
       (void)llvm::createESIMDVerifierPass();
-      (void)llvm::createPrepareSYCLNativeCPULegacyPass();
-      (void)llvm::createEmitSYCLNativeCPUHeaderLegacyPass();
       (void)llvm::createSYCLLowerInvokeSimdPass();
       std::string buf;
       llvm::raw_string_ostream os(buf);

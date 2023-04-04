@@ -33,36 +33,6 @@
 using namespace llvm;
 
 namespace {
-// Wrapper for the pass to make it working with the old pass manager
-class PrepareSYCLNativeCPULegacyPass : public ModulePass {
-public:
-  static char ID;
-  PrepareSYCLNativeCPULegacyPass() : ModulePass(ID) {
-    initializePrepareSYCLNativeCPULegacyPassPass(
-        *PassRegistry::getPassRegistry());
-  }
-
-  bool runOnModule(Module &M) override {
-    ModuleAnalysisManager MAM;
-    auto PA = Impl.run(M, MAM);
-    return !PA.areAllPreserved();
-  }
-
-private:
-  PrepareSYCLNativeCPUPass Impl;
-};
-
-} // namespace
-
-char PrepareSYCLNativeCPULegacyPass::ID = 0;
-INITIALIZE_PASS(PrepareSYCLNativeCPULegacyPass, "prepare-sycl-hc",
-                "Prepare SYCL Kernels for SYCL Native CPU", false, false)
-
-ModulePass *llvm::createPrepareSYCLNativeCPULegacyPass() {
-  return new PrepareSYCLNativeCPULegacyPass();
-}
-
-namespace {
 
 
 void fixCallingConv(Function* F) {

@@ -34,6 +34,4 @@ private:
   std::string NativeCPUHeaderName;
 };
 
-ModulePass *createEmitSYCLNativeCPUHeaderLegacyPass();
-
 } // namespace llvm

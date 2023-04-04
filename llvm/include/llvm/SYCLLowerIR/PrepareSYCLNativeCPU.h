@@ -27,6 +27,4 @@ public:
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM);
 };
 
-ModulePass *createPrepareSYCLNativeCPULegacyPass();
-
 } // namespace llvm
