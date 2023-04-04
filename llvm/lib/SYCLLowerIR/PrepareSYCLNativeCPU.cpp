@@ -125,6 +125,8 @@ PreservedAnalyses PrepareSYCLNativeCPUPass::run(Module &M,
     if (F.getCallingConv() == llvm::CallingConv::SPIR_KERNEL)
       OldKernels.push_back(&F);
   }
+  if(OldKernels.empty())
+    return PreservedAnalyses::all();
 
   // Materialize builtins
   // First we add a pointer to the host compilation state as arg to all the
