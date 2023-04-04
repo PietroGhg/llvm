@@ -21,6 +21,7 @@
 #include "clang/Basic/Builtins.h"
 #include "clang/Basic/Diagnostic.h"
 #include "clang/Basic/Version.h"
+#include "clang/Basic/SYCLNativeCPUHelpers.h"
 #include "clang/Sema/Initialization.h"
 #include "clang/Sema/Sema.h"
 #include "llvm/ADT/APSInt.h"
@@ -5249,7 +5250,6 @@ void SYCLIntegrationHeader::emit(raw_ostream &O) {
   if (llvm::SYCLNativeCPU) {
     // This is a temporary workaround for the integration header file
     // being emitted too early.
-    extern std::string getNativeCPUHeaderName(const LangOptions &LangOpts);
     std::string HCName = getNativeCPUHeaderName(S.getLangOpts());
 
     O << "\n// including the kernel handlers calling the kernels\n";

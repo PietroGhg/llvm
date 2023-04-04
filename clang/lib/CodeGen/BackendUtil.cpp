@@ -12,6 +12,7 @@
 #include "clang/Basic/LangOptions.h"
 #include "clang/Basic/TargetOptions.h"
 #include "clang/Basic/Targets/SPIR.h"
+#include "clang/Basic/SYCLNativeCPUHelpers.h"
 #include "clang/Frontend/FrontendDiagnostic.h"
 #include "clang/Frontend/Utils.h"
 #include "clang/Lex/HeaderSearchOptions.h"
@@ -762,17 +763,6 @@ static void addSanitizers(const Triple &TargetTriple,
     PB.registerOptimizerLastEPCallback(SanitizersCallback);
   }
 }
-
-// Uwe todo: find better place for this function, if we need it
-// at all. Currently also used by SemaSYCL
-namespace clang {
-std::string getNativeCPUHeaderName(const LangOptions &LangOpts) {
-  std::string HCName = LangOpts.SYCLNativeCPUHeader;
-  if (HCName == "")
-    HCName = LangOpts.SYCLIntHeader + ".hc";
-  return HCName;
-}
-} // namespace clang
 
 void EmitAssemblyHelper::RunOptimizationPipeline(
     BackendAction Action, std::unique_ptr<raw_pwrite_stream> &OS,
