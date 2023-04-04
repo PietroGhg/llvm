@@ -198,13 +198,13 @@ PreservedAnalyses EmitSYCLNativeCPUHeaderPass::run(Module &M,
 
   // Emit native CPU helper header
   if (NativeCPUHeaderName == "") {
-    report_fatal_error("No file name for Native CPU helper header specified");
+    report_fatal_error("No file name for Native CPU helper header specified", false);
   }
   int HCHeaderFD = 0;
   std::error_code EC =
       llvm::sys::fs::openFileForWrite(NativeCPUHeaderName, HCHeaderFD);
   if (EC) {
-    report_fatal_error(StringRef(EC.message()));
+    report_fatal_error(StringRef(EC.message()), false);
   }
   llvm::raw_fd_ostream O(HCHeaderFD, true);
   O << "#pragma once\n";

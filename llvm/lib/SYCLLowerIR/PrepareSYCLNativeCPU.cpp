@@ -134,7 +134,7 @@ PreservedAnalyses PrepareSYCLNativeCPUPass::run(Module &M,
   Type *StateType = StructType::getTypeByName(M.getContext(), "struct._hc_state");
   if (!StateType)
     report_fatal_error("Couldn't find the host compilation state in the "
-                       "module, make sure that -D __SYCL_NATIVE_CPU__ is set");
+                       "module, make sure that -D __SYCL_NATIVE_CPU__ is set", false);
   Type *StatePtrType = PointerType::getUnqual(StateType);
   SmallVector<Function *> NewKernels;
   for (auto &oldF : OldKernels) {
