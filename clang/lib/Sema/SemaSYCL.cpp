@@ -1041,7 +1041,7 @@ static QualType calculateKernelNameType(ASTContext &Ctx,
 // for RTTI etc when compiling host and device code together.
 // Therefore the mangling of the kernel function is changed for
 // NativeCPU to avoid such potential collision.
-static void fixManglingForNativeCPU(std::string &Name) {
+static void changeManglingForNativeCPU(std::string &Name) {
   const std::string Target("_ZTS");
   const size_t Pos = Name.find(Target);
   if(Pos == std::string::npos)
@@ -1071,7 +1071,7 @@ constructKernelName(Sema &S, const FunctionDecl *KernelCallerFunc,
   // including the MS mangler.
   if (llvm::SYCLNativeCPU) {
     MangledName = StableName;
-    fixManglingForNativeCPU(MangledName);
+    changeManglingForNativeCPU(MangledName);
   }
 
   return {MangledName, StableName};
