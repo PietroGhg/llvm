@@ -4,7 +4,7 @@ The SYCL Native CPU flow aims at treating the host CPU as a "first class citizen
 
 # Compiler and runtime options
 
-The SYCL Host Compilation flow is enabled by the `-fsycl-native-cpu` compiler option (please note that currently `-fsycl-native-cpu` overrides any other SYCL target specified in the compiler invocation):
+The SYCL Native CPU flow is enabled by the `-fsycl-native-cpu` compiler option (please note that currently `-fsycl-native-cpu` overrides any other SYCL target specified in the compiler invocation):
 
 ```
 clang++ -fsycl -fsycl-native-cpu <input> -o <output>

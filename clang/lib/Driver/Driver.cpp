@@ -5677,9 +5677,9 @@ class OffloadingActionBuilder final {
 
           bool IsSYCLNativeCPU = isSYCLNativeCPU(Args);
           if (IsSYCLNativeCPU) {
-            // for SYCL host compilation, we just take the linked device
-            // modules, lower them to a shared lib, and it to the host shared
-            // lib.
+            // for SYCL Native CPU, we just take the linked device
+            // modules, lower them to a shared lib, and link it to the host
+            // shared lib.
             auto *backendAct = C.MakeAction<BackendJobAction>(
                 FullDeviceLinkAction, types::TY_PP_Asm);
             auto *asmAct =
@@ -9603,7 +9603,6 @@ const ToolChain &Driver::getToolChain(const ArgList &Args,
 const ToolChain &Driver::getOffloadingDeviceToolChain(const ArgList &Args,
                   const llvm::Triple &Target, const ToolChain &HostTC,
                   const Action::OffloadKind &TargetDeviceOffloadKind) const {
-  bool IsSYCLNativeCPU = isSYCLNativeCPU(Args);
   // Use device / host triples offload kind as the key into the ToolChains map
   // because the device ToolChain we create depends on both.
   auto &TC = ToolChains[Target.str() + "/" + HostTC.getTriple().str() +
@@ -9652,7 +9651,7 @@ const ToolChain &Driver::getOffloadingDeviceToolChain(const ArgList &Args,
                 *this, Target, HostTC, Args, TargetDeviceOffloadKind);
             break;
           default:
-            if (IsSYCLNativeCPU) {
+            if (isSYCLNativeCPU(Args)) {
               TC = std::make_unique<toolchains::SYCLToolChain>(*this, Target,
                                                                HostTC, Args);
             }

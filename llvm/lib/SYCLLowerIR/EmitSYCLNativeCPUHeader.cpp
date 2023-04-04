@@ -198,7 +198,8 @@ PreservedAnalyses EmitSYCLNativeCPUHeaderPass::run(Module &M,
 
   // Emit native CPU helper header
   if (NativeCPUHeaderName == "") {
-    report_fatal_error("No file name for Native CPU helper header specified", false);
+    report_fatal_error("No file name for Native CPU helper header specified",
+                       false);
   }
   int HCHeaderFD = 0;
   std::error_code EC =

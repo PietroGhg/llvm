@@ -1,5 +1,4 @@
-//===------ PrepareSYCLHostCompilation.cpp - SYCL Host Compilation Preparation
-// Pass ------===//
+//===------ PrepareSYCLNativeCPU.cpp - SYCL Native CPU Preparation Pass ---===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -7,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Prepares the kernel for SYCL Host Compilation:
+// Prepares the kernel for SYCL Native CPU:
 // * Handles kernel calling convention and attributes.
 // * Materializes spirv buitlins.
 //===----------------------------------------------------------------------===//
@@ -57,7 +56,7 @@ private:
 
 char PrepareSYCLNativeCPULegacyPass::ID = 0;
 INITIALIZE_PASS(PrepareSYCLNativeCPULegacyPass, "prepare-sycl-hc",
-                "Prepare SYCL Kernels for SYCL Host Compilation", false, false)
+                "Prepare SYCL Kernels for SYCL Native CPU", false, false)
 
 ModulePass *llvm::createPrepareSYCLNativeCPULegacyPass() {
   return new PrepareSYCLNativeCPULegacyPass();
@@ -129,12 +128,13 @@ PreservedAnalyses PrepareSYCLNativeCPUPass::run(Module &M,
     return PreservedAnalyses::all();
 
   // Materialize builtins
-  // First we add a pointer to the host compilation state as arg to all the
+  // First we add a pointer to the Native CPU state as arg to all the
   // kernels.
   Type *StateType = StructType::getTypeByName(M.getContext(), "struct._hc_state");
   if (!StateType)
-    report_fatal_error("Couldn't find the host compilation state in the "
-                       "module, make sure that -D __SYCL_NATIVE_CPU__ is set", false);
+    report_fatal_error("Couldn't find the Native CPU state in the "
+                       "module, make sure that -D __SYCL_NATIVE_CPU__ is set",
+                       false);
   Type *StatePtrType = PointerType::getUnqual(StateType);
   SmallVector<Function *> NewKernels;
   for (auto &oldF : OldKernels) {

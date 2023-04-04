@@ -168,7 +168,7 @@ namespace __spirv {
 
 // Helper function templates to initialize and get vector component from SPIR-V
 // built-in variables
-// Disable index flipping for sycl host compilation
+// Disable index flipping for SYCL Native CPU
 #ifndef __SYCL_NATIVE_CPU__
 #define __SPIRV_DEFINE_INIT_AND_GET_HELPERS(POSTFIX)                           \
   template <int ID> static size_t get##POSTFIX();                              \

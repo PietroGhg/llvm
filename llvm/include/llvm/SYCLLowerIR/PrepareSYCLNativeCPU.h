@@ -1,5 +1,4 @@
-//===------- PrepareSYCLHostCompilation.h - Prepares module for SYCL Host
-//Compilation -------===//
+//===------- PrepareSYCLNativeCPU.h - Prepares module for SYCL Native CPU--===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.

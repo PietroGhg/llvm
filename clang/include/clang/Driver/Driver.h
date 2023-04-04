@@ -888,7 +888,7 @@ public:
         {FileName, std::make_pair(IntHeaderName, IntFooterName)});
   }
 
-  /// add integration helper header for host compilation
+  /// add integration helper header for SYCL Native CPU
   void addIntegrationNativeCPUHeader(StringRef NativeCPUHeaderName,
                                      StringRef FileName) const {
     NativeCPUIntegrationFiles.insert({FileName, NativeCPUHeaderName});
@@ -901,8 +901,8 @@ public:
   StringRef getIntegrationFooter(StringRef FileName) const {
     return IntegrationFileList[FileName].second;
   }
-  /// getHCHelperHeader - Get the helper header for SYCL Host Compilation
-  StringRef getHCHelperHeader(StringRef FileName) const {
+  /// getNativeCPUHelperHeader - Get the helper header for SYCL Native CPU
+  StringRef getNativeCPUHelperHeader(StringRef FileName) const {
     return NativeCPUIntegrationFiles[FileName];
   }
   /// createAppendedFooterInput - Create new source file.

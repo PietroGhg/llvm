@@ -5240,8 +5240,8 @@ void SYCLIntegrationHeader::emit(raw_ostream &O) {
 
   /* We emit the *subhandler function here, these are used because we
    * don't have access to the unmangled kernel name when we generate the
-   * host compilation kernel header. KernelHandler calls this subhandler,
-   * which is defined in the host compilation kernel header, when we have
+   * SYCL Native CPU helper header. KernelHandler calls this subhandler,
+   * which is defined in the helper header, when we have
    * info about which arguments are used in the kernel.
    */
   auto printSubHandler = [](raw_ostream &O, const KernelDesc &K) {

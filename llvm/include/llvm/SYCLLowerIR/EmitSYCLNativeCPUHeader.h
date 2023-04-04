@@ -1,4 +1,4 @@
-//===------- EmitSYCLHCHeader.h - Emits the SYCL Host Compilation helper header
+//===------- EmitSYCLHCHeader.h - Emits the SYCL Native CPU helper header
 //-------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -7,7 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This pass emits the SYCL Host Compilation helper header.
+// This pass emits the SYCL Native CPU helper header.
 // The header mainly contatins the definition for the handler function which
 // allows to call the kernel extracted by the device compiler from the host
 // runtime.

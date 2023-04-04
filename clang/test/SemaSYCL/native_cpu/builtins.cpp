@@ -32,7 +32,7 @@ int main() {
 
 // check that we added the state struct as a function argument, and that we inject the calls to 
 // our builtins.
-// We disable index flipping when doing host compilation, so id.get_global_id(1) maps to 
+// We disable index flipping for SYCL Native CPU, so id.get_global_id(1) maps to 
 // dimension 1 for a 2-D kernel (as opposed to dim 0), etc
 
 // CHECK: @_Z5Test1(i32 addrspace(1)* %0, %"class.sycl::_V1::id"* %1, %struct._hc_state* %2)
