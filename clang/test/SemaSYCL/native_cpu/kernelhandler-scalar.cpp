@@ -1,5 +1,6 @@
-// RUN: %clangxx -fsycl-device-only  -fsycl-native-cpu -Xclang -fsycl-int-header=%t.h -Xclang -fsycl-native-cpu-header=%t-hc.h -o %t.bc %s 
+// RUN: %clangxx -fsycl-device-only  -fsycl-native-cpu -Xclang -fsycl-int-header=%t.h -Xclang -fsycl-native-cpu-header=%t-hc.h -S -o %t.ll %s 
 // RUN: FileCheck -input-file=%t-hc.h %s 
+// RUN: FileCheck -input-file=%t.ll %s --check-prefix=CHECK-LL
 // Compiling generated main integration header to check correctness, -fsycl option used to find required includes
 // RUN: %clangxx -fsycl -c -x c++ %t.h
 #include <CL/sycl.hpp>
@@ -16,17 +17,17 @@ class init_a;
 template <typename T>
 bool test(queue myQueue) {
   {
-    buffer<float, 1> a(range<1>{N});
+    buffer<T, 1> a(range<1>{N});
     T test = 42;
 
     myQueue.submit([&](handler& cgh) {
-      auto A = a.get_access<access::mode::write>(cgh);
+      auto A = a.template get_access<access::mode::write>(cgh);
       cgh.parallel_for<init_a<T>>(range<1>{N}, [=](id<1> index) {
         A[index] = test;
       });
     });
 
-    auto A = a.get_access<access::mode::read>();
+    auto A = a.template get_access<access::mode::read>();
     std::cout << "Result:" << std::endl;
     for (size_t i = 0; i < N; i++) {
         if (A[i] != test) {
@@ -86,3 +87,12 @@ int main() {
 // CHECK-NEXT:  _Z6init_aIdE(arg0, arg3, arg4, state);
 // CHECK-NEXT:};
 
+
+// CHECK-LL-DAG: @_Z6init_aIiE(ptr %0, ptr %1, i32 %2, ptr %3){{.*}}!kernel_arg_type ![[TYPE1:[0-9]*]]
+// CHECK-LL-DAG: @_Z6init_aIjE(ptr %0, ptr %1, i32 %2, ptr %3){{.*}}!kernel_arg_type ![[TYPE2:[0-9]*]]
+// CHECK-LL-DAG: @_Z6init_aIfE(ptr %0, ptr %1, float %2, ptr %3){{.*}}!kernel_arg_type ![[TYPE3:[0-9]*]]
+// CHECK-LL-DAG: @_Z6init_aIdE(ptr %0, ptr %1, double %2, ptr %3){{.*}}!kernel_arg_type ![[TYPE4:[0-9]*]]
+// CHECK-LL-DAG: ![[TYPE1]] = !{!"int*", !"sycl::range<>", !"sycl::range<>", !"sycl::id<>", !"int"}
+// CHECK-LL-DAG: ![[TYPE2]] = !{!"uint*", !"sycl::range<>", !"sycl::range<>", !"sycl::id<>", !"unsigned int"}
+// CHECK-LL-DAG: ![[TYPE3]] = !{!"float*", !"sycl::range<>", !"sycl::range<>", !"sycl::id<>", !"float"}
+// CHECK-LL-DAG: ![[TYPE4]] = !{!"double*", !"sycl::range<>", !"sycl::range<>", !"sycl::id<>", !"double"}
