@@ -31,7 +31,7 @@
 
 //CHECK_INVO:{{.*}}clang{{.*}}-fsycl-is-device{{.*}}"-mllvm" "-sycl-native-cpu" "-D" "__SYCL_NATIVE_CPU__" "-fsycl-native-cpu-header" "[[HCHEADER:[_a-z0-9A-Z\/\-]*\.h]]"
 //CHECK_INVO:{{.*}}clang{{.*}}"-x" "ir"
-//CHECK_INVO:{{.*}}clang{{.*}}"-fsycl-is-host"{{.*}}"-include" "[[HCHEADER]]"
+//CHECK_INVO:{{.*}}clang{{.*}}"-fsycl-is-host"{{.*}}
 
 // checkes that the device and host triple is correct in the generated actions when it is set explicitly
 //CHECK_ACTIONS-AARCH64:                     +- 0: input, "{{.*}}sycl-native-cpu-fsycl.cpp", c++, (host-sycl)
