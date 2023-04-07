@@ -86,7 +86,7 @@ void emitKernelDecl(const Function *F, const SmallVector<bool> &argMask,
   O << "extern \"C\" void " << F->getName() << "(";
 
   unsigned I = 0, UsedI = 0;
-  for (; I < argMask.size() - 1 && UsedI < NumParams - 1; I++) {
+  for (; I + 1 < argMask.size() && UsedI + 1 < NumParams; I++) {
     if (!argMask[I])
       continue;
     O << EmitArgDecl(F->getArg(UsedI), I) << ", ";
@@ -152,7 +152,6 @@ void emitSubKernelHandler(const Function *F, const SmallVector<bool> &argMask,
 
 PreservedAnalyses EmitSYCLNativeCPUHeaderPass::run(Module &M,
                                                    ModuleAnalysisManager &MAM) {
-  bool ModuleChanged = false;
   SmallVector<Function *> Kernels;
   for (auto &F : M) {
     if (F.getCallingConv() == llvm::CallingConv::SPIR_KERNEL)
@@ -181,5 +180,5 @@ PreservedAnalyses EmitSYCLNativeCPUHeaderPass::run(Module &M,
     emitSubKernelHandler(F, argMask, ArgTypeNames, O);
   }
 
-  return ModuleChanged ? PreservedAnalyses::all() : PreservedAnalyses::none();
+  return PreservedAnalyses::all();
 }

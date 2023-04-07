@@ -200,6 +200,6 @@ PreservedAnalyses PrepareSYCLNativeCPUPass::run(Module &M,
   for (auto F : NewKernels) {
     fixCallingConv(F);
   }
-
-  return ModuleChanged ? PreservedAnalyses::all() : PreservedAnalyses::none();
+  // todo: return preserved analyses instead of none
+  return ModuleChanged ? PreservedAnalyses::none() : PreservedAnalyses::all();
 }
