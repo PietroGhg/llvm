@@ -71,7 +71,7 @@ Function *addArg(Function *oldF, Type *T) {
 }
 
 static std::map<std::string, std::string> BuiltinNamesMap{
-    {"__spirv_BuiltInGlobalInvocationId", "_Z16hc_get_global_idmP9_hc_state"}};
+    {"__spirv_BuiltInGlobalInvocationId", "_Z13get_global_idmP15nativecpu_state"}};
 
 Function *getReplaceFunc(Module &M, Type *T, StringRef Name) {
   Function *F = M.getFunction(Name);
@@ -100,7 +100,7 @@ PreservedAnalyses PrepareSYCLNativeCPUPass::run(Module &M,
   // Materialize builtins
   // First we add a pointer to the Native CPU state as arg to all the
   // kernels.
-  Type *StateType = StructType::getTypeByName(M.getContext(), "struct._hc_state");
+  Type *StateType = StructType::getTypeByName(M.getContext(), "struct.nativecpu_state");
   if (!StateType)
     report_fatal_error("Couldn't find the Native CPU state in the "
                        "module, make sure that -D __SYCL_NATIVE_CPU__ is set",

@@ -5310,7 +5310,7 @@ void SYCLIntegrationHeader::emit(raw_ostream &O) {
     if (llvm::SYCLNativeCPU) {
       O << "  static inline void NCPUKernelHandler(const "
            "std::vector<sycl::detail::NativeCPUArgDesc>& MArgs, "
-           "_hc_state* s) {\n";
+           "nativecpu_state* s) {\n";
       O << "    ";
       printSubHandler(O, K);
       O << "(MArgs, s);\n";

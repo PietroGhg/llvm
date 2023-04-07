@@ -21,7 +21,7 @@ int main() {
 
 // CHECK-H: template <> struct KernelInfo<::Test1> {
 // CHECK-H-NEXT:   static constexpr bool is_native_cpu = 1;
-// CHECK-H-NEXT:   static inline void NCPUKernelHandler(const std::vector<sycl::detail::NativeCPUArgDesc>& MArgs, _hc_state* s) {
+// CHECK-H-NEXT:   static inline void NCPUKernelHandler(const std::vector<sycl::detail::NativeCPUArgDesc>& MArgs, nativecpu_state* s) {
 // CHECK-H-NEXT:     _Z5Test1subhandler(MArgs, s);
 // CHECK-H-NEXT:   }
 
@@ -30,6 +30,6 @@ int main() {
 //CHECK-HC: #pragma once
 //CHECK-HC-NEXT: #include <sycl/detail/native_cpu.hpp>
 //CHECK-HC:extern "C" void _Z5Test1();
-//CHECK-HC:inline static void _Z5Test1subhandler(const std::vector<sycl::detail::NativeCPUArgDesc>& MArgs, _hc_state *state) {
+//CHECK-HC:inline static void _Z5Test1subhandler(const std::vector<sycl::detail::NativeCPUArgDesc>& MArgs, nativecpu_state *state) {
 //CHECK-HC-NEXT:  _Z5Test1();
 //CHECK-HC-NEXT:};

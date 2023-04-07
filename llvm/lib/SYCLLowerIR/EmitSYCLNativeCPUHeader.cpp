@@ -98,7 +98,7 @@ void emitKernelDecl(const Function *F, const SmallVector<bool> &argMask,
     O << ");\n";
     return;
   }
-  O << EmitArgDecl(F->getArg(UsedI), I) << ", _hc_state *);\n";
+  O << EmitArgDecl(F->getArg(UsedI), I) << ", nativecpu_state *);\n";
 }
 
 void emitSubKernelHandler(const Function *F, const SmallVector<bool> &argMask,
@@ -123,7 +123,7 @@ void emitSubKernelHandler(const Function *F, const SmallVector<bool> &argMask,
 
   O << "\ninline static void " << F->getName() << "subhandler(";
   O << "const std::vector<sycl::detail::NativeCPUArgDesc>& MArgs, "
-       "_hc_state *state) {\n";
+       "nativecpu_state *state) {\n";
   // Retrieve only the args that are used
   for (unsigned I = 0, UsedI = 0;
        I < argMask.size() && UsedI < F->getFunctionType()->getNumParams();

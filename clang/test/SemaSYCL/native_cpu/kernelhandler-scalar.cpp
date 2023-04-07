@@ -55,32 +55,32 @@ int main() {
 
 
 
-// CHECK:extern "C" void _Z6init_aIiE(void *, void *, int, _hc_state *);
-// CHECK:inline static void _Z6init_aIiEsubhandler(const std::vector<sycl::detail::NativeCPUArgDesc>& MArgs, _hc_state *state) {
+// CHECK:extern "C" void _Z6init_aIiE(void *, void *, int, nativecpu_state *);
+// CHECK:inline static void _Z6init_aIiEsubhandler(const std::vector<sycl::detail::NativeCPUArgDesc>& MArgs, nativecpu_state *state) {
 // CHECK-NEXT:  void* arg0 = MArgs[0].getPtr();
 // CHECK-NEXT:  void* arg3 = MArgs[3].getPtr();
 // CHECK-NEXT:  int arg4 = *(int*)MArgs[4].getPtr();
 // CHECK-NEXT:  _Z6init_aIiE(arg0, arg3, arg4, state);
 // CHECK-NEXT:};
 
-// CHECK:extern "C" void _Z6init_aIjE(void *, void *, unsigned int, _hc_state *);
-// CHECK:inline static void _Z6init_aIjEsubhandler(const std::vector<sycl::detail::NativeCPUArgDesc>& MArgs, _hc_state *state) {
+// CHECK:extern "C" void _Z6init_aIjE(void *, void *, unsigned int, nativecpu_state *);
+// CHECK:inline static void _Z6init_aIjEsubhandler(const std::vector<sycl::detail::NativeCPUArgDesc>& MArgs, nativecpu_state *state) {
 // CHECK-NEXT:  void* arg0 = MArgs[0].getPtr();
 // CHECK-NEXT:  void* arg3 = MArgs[3].getPtr();
 // CHECK-NEXT:  unsigned int arg4 = *(unsigned int*)MArgs[4].getPtr();
 // CHECK-NEXT:  _Z6init_aIjE(arg0, arg3, arg4, state);
 // CHECK-NEXT:};
 
-// CHECK:extern "C" void _Z6init_aIfE(void *, void *, float, _hc_state *);
-// CHECK:inline static void _Z6init_aIfEsubhandler(const std::vector<sycl::detail::NativeCPUArgDesc>& MArgs, _hc_state *state) {
+// CHECK:extern "C" void _Z6init_aIfE(void *, void *, float, nativecpu_state *);
+// CHECK:inline static void _Z6init_aIfEsubhandler(const std::vector<sycl::detail::NativeCPUArgDesc>& MArgs, nativecpu_state *state) {
 // CHECK-NEXT:  void* arg0 = MArgs[0].getPtr();
 // CHECK-NEXT:  void* arg3 = MArgs[3].getPtr();
 // CHECK-NEXT:  float arg4 = *(float*)MArgs[4].getPtr();
 // CHECK-NEXT:  _Z6init_aIfE(arg0, arg3, arg4, state);
 // CHECK-NEXT:};
 
-// CHECK:extern "C" void _Z6init_aIdE(void *, void *, double, _hc_state *);
-// CHECK:inline static void _Z6init_aIdEsubhandler(const std::vector<sycl::detail::NativeCPUArgDesc>& MArgs, _hc_state *state) {
+// CHECK:extern "C" void _Z6init_aIdE(void *, void *, double, nativecpu_state *);
+// CHECK:inline static void _Z6init_aIdEsubhandler(const std::vector<sycl::detail::NativeCPUArgDesc>& MArgs, nativecpu_state *state) {
 // CHECK-NEXT:  void* arg0 = MArgs[0].getPtr();
 // CHECK-NEXT:  void* arg3 = MArgs[3].getPtr();
 // CHECK-NEXT:  double arg4 = *(double*)MArgs[4].getPtr();

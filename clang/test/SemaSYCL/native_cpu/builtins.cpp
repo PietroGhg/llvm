@@ -1,4 +1,4 @@
-// RUN: %clangxx -fsycl-device-only  -D __SYCL_NATIVE_CPU__ -mllvm -sycl-native-cpu -Xclang -fsycl-native-cpu-header=%t-hc.h -sycl-std=2020 -mllvm -sycl-opt -S -emit-llvm  -o - %s | FileCheck %s
+// RUN: %clangxx -fsycl-device-only  -fsycl-native-cpu -Xclang -fsycl-native-cpu-header=%t-hc.h -sycl-std=2020 -mllvm -sycl-opt -S -emit-llvm  -o - %s | FileCheck %s
 
 #include "sycl.hpp"
 class Test1;
@@ -35,11 +35,11 @@ int main() {
 // We disable index flipping for SYCL Native CPU, so id.get_global_id(1) maps to 
 // dimension 1 for a 2-D kernel (as opposed to dim 0), etc
 
-// CHECK: @_Z5Test1(i32 addrspace(1)* %0, %"class.sycl::_V1::id"* %1, %struct._hc_state* %2)
-// CHECK: call{{.*}}_Z16hc_get_global_idmP9_hc_state(i64 0, %struct._hc_state* %2)
+// CHECK: @_Z5Test1(ptr %0, ptr %1, ptr %2)
+// CHECK: call{{.*}}_Z13get_global_idmP15nativecpu_state(i64 0, ptr %2)
 
-// CHECK: @_Z5Test2(i32 addrspace(1)* %0, %"class.sycl::_V1::id"* %1, %struct._hc_state* %2)
-// CHECK: call{{.*}}_Z16hc_get_global_idmP9_hc_state(i64 1, %struct._hc_state* %2)
+// CHECK: @_Z5Test2(ptr %0, ptr %1, ptr %2)
+// CHECK: call{{.*}}_Z13get_global_idmP15nativecpu_state(i64 1, ptr %2)
 
-// CHECK: @_Z5Test3(i32 addrspace(1)* %0, %"class.sycl::_V1::id"* %1, %struct._hc_state* %2)
-// CHECK: call{{.*}}_Z16hc_get_global_idmP9_hc_state(i64 2, %struct._hc_state* %2)
+// CHECK: @_Z5Test3(ptr %0, ptr %1, ptr %2)
+// CHECK: call{{.*}}_Z13get_global_idmP15nativecpu_state(i64 2, ptr %2)

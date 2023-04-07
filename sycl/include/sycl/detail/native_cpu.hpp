@@ -56,9 +56,9 @@ inline constexpr bool is_native_cpu_v = is_native_cpu<T>::value;
 } // __SYCL_INLINE_VER_NAMESPACE(_V1)
 } // namespace sycl
 
-extern "C" struct _hc_state {
+struct nativecpu_state {
   size_t MGlobal_id[3];
-  _hc_state() {
+  nativecpu_state() {
     MGlobal_id[0] = 0;
     MGlobal_id[1] = 0;
     MGlobal_id[2] = 0;
@@ -70,8 +70,8 @@ extern "C" struct _hc_state {
 #define __SYCL_HC_ATTRS                                                        \
   __attribute__((weak)) __attribute((alwaysinline))                            \
       [[intel::device_indirectly_callable]]
-extern "C" __SYCL_HC_ATTRS size_t _Z16hc_get_global_idmP9_hc_state(
-    size_t n, __attribute((address_space(0))) _hc_state *s) {
+extern "C" __SYCL_HC_ATTRS size_t _Z13get_global_idmP15nativecpu_state(
+    size_t n, __attribute((address_space(0))) nativecpu_state *s) {
   return s->MGlobal_id[n];
 }
 #undef __SYCL_HC_ATTRS
