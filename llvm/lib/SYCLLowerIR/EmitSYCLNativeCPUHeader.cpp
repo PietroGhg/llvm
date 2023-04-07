@@ -14,9 +14,11 @@
 #include "llvm/SYCLLowerIR/EmitSYCLNativeCPUHeader.h"
 
 #include "llvm/ADT/StringRef.h"
+#include "llvm/IR/Constant.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/Metadata.h"
 #include "llvm/IR/Type.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/Pass.h"
@@ -47,12 +49,16 @@ SmallVector<bool> getArgMask(const Function *F) {
   auto NumOperands = UsedNode->getNumOperands();
   for (unsigned I = 0; I < NumOperands; I++) {
     auto &Op = UsedNode->getOperand(I);
-    auto CAM = dyn_cast<ConstantAsMetadata>(Op.get());
-    assert(CAM && "Operand to sycl_kernel_omit_args is not a constant");
-    auto Const = dyn_cast<ConstantInt>(CAM->getValue());
-    assert(Const && "Operand to sycl_kernel_omit_args is not a constant int");
-    auto Val = Const->getValue();
-    res.push_back(!Val.getBoolValue());
+    if(auto CAM = dyn_cast<ConstantAsMetadata>(Op.get())) {
+      if(auto Const = dyn_cast<ConstantInt>(CAM->getValue())) {
+        auto Val = Const->getValue();
+        res.push_back(!Val.getBoolValue());
+      } else {
+        report_fatal_error("Unable to retrieve constant int from sycl_kernel_omit_args metadata node");
+      }
+    } else {
+      report_fatal_error("Error while processing sycl_kernel_omit_args metadata node");
+    }
   }
   return res;
 }
