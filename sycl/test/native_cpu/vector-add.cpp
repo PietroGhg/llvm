@@ -1,5 +1,5 @@
-// RUN: %clangxx -fsycl-device-only -fsycl-native-cpu  -Xclang -fsycl-native-cpu-header=%t-hc.h -Xclang -fsycl-int-header=%t.h -Xclang -fsycl-int-footer=%t-footer.h %s -o %t.bc
-// RUN: %clangxx -include %t.h -include %t-hc.h -I %sycl_include -I %sycl_include/sycl  %s -O2 -c -o %t-host.o
+// RUN: %clangxx -fsycl-device-only -fsycl-native-cpu -Xclang -fsycl-int-header=%t.h -Xclang -fsycl-int-footer=%t-footer.h %s -o %t.bc
+// RUN: %clangxx -std=c++17 -include %t.h -I %sycl_include -I %sycl_include/sycl  %s -O2 -c -o %t-host.o
 // RUN: %clangxx %t.bc -O3 -c -o %t-kernel.o
 // RUN: %clangxx -L %sycl_libs_dir -lsycl %t-kernel.o %t-host.o -o %t
 // RUN: env ONEAPI_DEVICE_SELECTOR="host:*" %t
