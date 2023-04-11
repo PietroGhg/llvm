@@ -5038,9 +5038,6 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
       CmdArgs.push_back("-sycl-native-cpu");
       CmdArgs.push_back("-D");
       CmdArgs.push_back("__SYCL_NATIVE_CPU__");
-      CmdArgs.push_back("-fsycl-native-cpu-header");
-      CmdArgs.push_back(
-          Args.MakeArgString(D.getNativeCPUHelperHeader(Input.getBaseInput())));
     }
 
     // Turn on Dead Parameter Elimination Optimization with early optimizations

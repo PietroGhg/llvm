@@ -6743,7 +6743,6 @@ def fsycl_int_footer : Separate<["-"], "fsycl-int-footer">,
 def fsycl_int_footer_EQ : Joined<["-"], "fsycl-int-footer=">,
   Alias<fsycl_int_footer>;
 def fsycl_native_cpu_header : Separate<["-"], "fsycl-native-cpu-header">,
-  HelpText<"Generate SYCL Native CPU helper header into this file.">,
   MarshallingInfoString<LangOpts<"SYCLNativeCPUHeader">>;
 def fsycl_native_cpu_header_EQ : Joined<["-"], "fsycl-native-cpu-header=">,
   Alias<fsycl_native_cpu_header>;
