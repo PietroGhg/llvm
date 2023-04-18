@@ -36,10 +36,10 @@ int main() {
 // dimension 1 for a 2-D kernel (as opposed to dim 0), etc
 
 // CHECK: @_Z5Test1(ptr %0, ptr %1, ptr %2)
-// CHECK: call{{.*}}_Z13get_global_idmP15nativecpu_state(i64 0, ptr %2)
+// CHECK: call{{.*}}_Z13get_global_idmP15nativecpu_state(ptr %2)
 
 // CHECK: @_Z5Test2(ptr %0, ptr %1, ptr %2)
-// CHECK: call{{.*}}_Z13get_global_idmP15nativecpu_state(i64 1, ptr %2)
+// CHECK: call{{.*}}_Z13get_global_idmP15nativecpu_state(ptr %2)
 
 // CHECK: @_Z5Test3(ptr %0, ptr %1, ptr %2)
-// CHECK: call{{.*}}_Z13get_global_idmP15nativecpu_state(i64 2, ptr %2)
+// CHECK: call{{.*}}_Z13get_global_idmP15nativecpu_state(ptr %2)

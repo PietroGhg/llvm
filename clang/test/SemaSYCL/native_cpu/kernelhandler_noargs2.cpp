@@ -1,7 +1,7 @@
 // cmdline that used to fail in kernel handler emission
 // RUN: %clangxx -fsycl-device-only  -fsycl-native-cpu -Xclang -fsycl-native-cpu-header=%t-hc.h -sycl-std=2020 -mllvm -sycl-opt -S -emit-llvm  -o - %s
 // RUN: FileCheck -input-file=%t-hc.h %s --check-prefix=CHECK-HC
-// RUN: %clangxx -fsycl -c -x c++ %t-hc.h
+// RUN: %clangxx -fsycl -D __SYCL_NATIVE_CPU__ -c -x c++ %t-hc.h
 #include "sycl.hpp"
 
 template <typename name, typename Func>

@@ -1,5 +1,6 @@
 #pragma once
 #include "cg_types.hpp"
+#include <CL/__spirv/spirv_vars.hpp>
 #include <functional>
 #include <memory>
 #include <vector>
@@ -56,23 +57,25 @@ inline constexpr bool is_native_cpu_v = is_native_cpu<T>::value;
 } // __SYCL_INLINE_VER_NAMESPACE(_V1)
 } // namespace sycl
 
+#ifdef __SYCL_NATIVE_CPU__
+typedef size_t size_t_nativecpu_vec __attribute__((ext_vector_type(3)));
 struct nativecpu_state {
-  size_t MGlobal_id[3];
+  size_t_nativecpu_vec MGlobal_id;
   nativecpu_state() {
-    MGlobal_id[0] = 0;
-    MGlobal_id[1] = 0;
-    MGlobal_id[2] = 0;
+    MGlobal_id.x = 0;
+    MGlobal_id.y = 0;
+    MGlobal_id.z = 0;
   }
 };
-
-#ifdef __SYCL_NATIVE_CPU__
 #ifdef __SYCL_DEVICE_ONLY__
 #define __SYCL_HC_ATTRS                                                        \
   __attribute__((weak)) __attribute((alwaysinline))                            \
       [[intel::device_indirectly_callable]]
-extern "C" __SYCL_HC_ATTRS size_t _Z13get_global_idmP15nativecpu_state(
-    size_t n, __attribute((address_space(0))) nativecpu_state *s) {
-  return s->MGlobal_id[n];
+extern "C" __SYCL_HC_ATTRS __attribute((address_space(0)))
+size_t_nativecpu_vec *
+_Z13get_global_idmP15nativecpu_state(__attribute((address_space(0)))
+                                     nativecpu_state *s) {
+  return &(s->MGlobal_id);
 }
 #undef __SYCL_HC_ATTRS
 #endif

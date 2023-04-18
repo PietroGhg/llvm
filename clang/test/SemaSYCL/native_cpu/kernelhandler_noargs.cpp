@@ -2,7 +2,7 @@
 // RUN: FileCheck -input-file=%t.h %s --check-prefix=CHECK-H
 // RUN: FileCheck -input-file=%t-hc.h %s --check-prefix=CHECK-HC
 // Compiling generated main integration header to check correctness, -fsycl option used to find required includes 
-// RUN: %clangxx -fsycl -c -x c++ %t.h
+// RUN: %clangxx -fsycl -D __SYCL_NATIVE_CPU__ -c -x c++ %t.h
 
 #include "sycl.hpp"
 class Test1;
