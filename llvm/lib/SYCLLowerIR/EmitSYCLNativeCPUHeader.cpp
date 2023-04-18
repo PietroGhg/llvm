@@ -72,7 +72,8 @@ SmallVector<StringRef> getArgTypeNames(const Function *F) {
   for (unsigned I = 0; I < NumOperands; I++) {
     auto &Op = TNNode->getOperand(I);
     auto *MDS = dyn_cast<MDString>(Op.get());
-    assert(MDS && "kernel_arg_types operand not a metadata string");
+    if(!MDS)
+      report_fatal_error("error while processing kernel_arg_types metadata");
     Res.push_back(MDS->getString());
   }
   return Res;
