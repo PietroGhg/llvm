@@ -13,10 +13,13 @@
 
 #include "llvm/SYCLLowerIR/PrepareSYCLNativeCPU.h"
 
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Operator.h"
 #include "llvm/InitializePasses.h"
@@ -29,6 +32,7 @@
 #include "llvm/Transforms/Utils/ValueMapper.h"
 #include <functional>
 #include <numeric>
+#include <vector>
 
 using namespace llvm;
 
@@ -84,6 +88,23 @@ Value *getStateArg(Function *F) {
   return F->getArg(F_t->getNumParams() - 1);
 }
 
+SmallVector<Function *> getFunctionsFromUse(Use &U) {
+  // This function returns a vector since an operator may be used by
+  // instructions in multiple functions
+  User *Usr = U.getUser();
+  if (auto I = dyn_cast<Instruction>(Usr)) {
+    return {I->getFunction()};
+  }
+  if (auto Op = dyn_cast<Operator>(Usr)) {
+    SmallVector<Function *> Res;
+    for (auto &Use : Op->uses()) {
+      Res.push_back(dyn_cast<Instruction>(Use.getUser())->getFunction());
+    }
+    return Res;
+  }
+  return {};
+}
+
 } // namespace
 
 PreservedAnalyses PrepareSYCLNativeCPUPass::run(Module &M,
@@ -115,91 +136,104 @@ PreservedAnalyses PrepareSYCLNativeCPUPass::run(Module &M,
     ModuleChanged |= true;
   }
 
+  // Then we iterate over all the supported builtins, find their uses and
+  // replace them with calls to our Native CPU functions.
   for (auto &entry : BuiltinNamesMap) {
-    SmallVector<Instruction *> toDelete;
+    // Kernel -> builin materialization CallInst, this is used to avoid
+    // inserting multiple calls to the same builtin
+    std::map<Function *, CallInst *> BuiltinCallMap;
+    // Map that associates to each User of a builtin, the index of the builtin
+    // in its operand list, and the callinst that will replace the builtin
+    std::map<User *, std::pair<unsigned, CallInst *>> ToReplace;
+    // We need to handle GEPOperator uses in a separate case since they are
+    // constants
+    std::set<GEPOperator *> GEPOps;
     // spirv builtins are global constants, find it in the module
     auto Glob = M.getNamedGlobal(entry.first);
     if (!Glob)
       continue;
     auto replaceFunc = getReplaceFunc(M, StatePtrType, entry.second);
     for (auto &Use : Glob->uses()) {
-      if (isa<LoadInst>(Use.getUser())) {
-        auto load = dyn_cast<llvm::LoadInst>(Use.getUser());
-        auto StateArg = getStateArg(load->getFunction());
-        // the builtin is used in a load -> extractelement pattern
-        bool IsExtractUse = llvm::all_of(load->uses(), [](class Use &U) {
-          return isa<ExtractElementInst>(U.getUser());
-        });
-        if (IsExtractUse) {
-          for (auto &LoadUse : load->uses()) {
-            auto extract =
-                dyn_cast<llvm::ExtractElementInst>(LoadUse.getUser());
-            if (!extract)
-              llvm::errs() << *load->getFunction()->getParent() << "\n";
-            // replace "extract <builtin> <index>" with
-            // "call builtin_func(<index>, state)". the state is the last
-            // argument of the kernel function
-            Value *index = extract->getOperand(1);
-            assert(StateArg->getType() == StatePtrType);
-            auto newCall = llvm::CallInst::Create(
-                replaceFunc->getFunctionType(), replaceFunc, {index, StateArg},
-                "hc_builtin", extract);
-            extract->replaceAllUsesWith(newCall);
-            toDelete.push_back(extract);
-            ModuleChanged = true;
-          }
-          toDelete.push_back(load);
+      auto Funcs = getFunctionsFromUse(Use);
+      if (Funcs.empty()) {
+        // todo: use without a parent function?
+        continue;
+      }
+      for (auto &F : Funcs) {
+        auto NewCall_it = BuiltinCallMap.find(F);
+        CallInst *NewCall;
+        // check if we already inserted a call to our function
+        if (NewCall_it != BuiltinCallMap.end()) {
+          NewCall = NewCall_it->second;
         } else {
-          // this is a load straight from the builtin, replace with a call with
-          // index 0
-          auto &Ctx = load->getContext();
-          Value *NewIndex = ConstantInt::get(IntegerType::get(Ctx, 64), 0);
-          auto *NewCall = llvm::CallInst::Create(
-              replaceFunc->getFunctionType(), replaceFunc, {NewIndex, StateArg},
-              "hc_builtin", load);
-          load->replaceAllUsesWith(NewCall);
-          toDelete.push_back(load);
-          ModuleChanged = true;
+          auto StateArg = getStateArg(F);
+          NewCall = llvm::CallInst::Create(
+              replaceFunc->getFunctionType(), replaceFunc, {StateArg},
+              "ncpu_builtin", F->getEntryBlock().getFirstNonPHI());
+          BuiltinCallMap.insert({F, NewCall});
         }
-      } else if (isa<GEPOperator>(Use.getUser())) {
-        // the builting is used as val = load (gep builtin 0 <index>)
-        // we replace it with val = builtin(<index>)
-        auto GEPOp = dyn_cast<GEPOperator>(Use.getUser());
-        assert(GEPOp->getNumIndices() == 2 &&
-               "Unsupported GEPOperator in builtin use");
-        auto Index = (GEPOp->op_begin() + 2)->get();
-        for (auto &GEPOpUse : GEPOp->uses()) {
-          auto *Load = dyn_cast<LoadInst>(GEPOpUse.getUser());
-          if (!Load) {
-            // Todo: the gepoperator here seems to have dead uses that are still
-            // linked
-            assert(GEPOpUse.getUser()->getNumUses() == 0);
-            continue;
+        User *Usr = Use.getUser();
+        if (auto GEPOp = dyn_cast<GEPOperator>(Usr)) {
+          GEPOps.insert(GEPOp);
+        } else {
+          // Find the index of the builtin in the user's operand list
+          // We are guaranteed to find it since we are already iterating over
+          // the builtin's uses.
+          bool Found = false;
+          unsigned Index = 0;
+          for (unsigned I = 0; I < Usr->getNumOperands() && !Found; I++) {
+            if (Usr->getOperand(I) == Glob) {
+              Found = true;
+              Index = I;
+            }
           }
-          assert(Load && "GEPOperator use is not a load");
-          auto stateArg = getStateArg(Load->getFunction());
-          assert(stateArg->getType() == StatePtrType);
-          auto newCall = llvm::CallInst::Create(replaceFunc->getFunctionType(),
-                                                replaceFunc, {Index, stateArg},
-                                                "hc_builtin", Load);
-          Load->replaceAllUsesWith(newCall);
-          toDelete.push_back(Load);
-          ModuleChanged = true;
+          assert(Found && "Unable to find builtin in operand list");
+          ToReplace.insert({Usr, {Index, NewCall}});
         }
-
-      } else {
-        llvm_unreachable("Unsupported builtin use");
       }
     }
-    for (auto &I : toDelete) {
-      I->eraseFromParent();
+
+    // Handle the non-constant builtin uses, simply replace the builtin with the
+    // return value of our function call
+    for (auto &Entry : ToReplace) {
+      unsigned Index = Entry.second.first;
+      CallInst *NewCall = Entry.second.second;
+      User *Usr = Entry.first;
+      Usr->setOperand(Index, NewCall);
     }
+
+    // Handle the constant builtin uses, we insert a non-constant GEP
+    // instruction that uses the return value of our function call, and replaces
+    // the original GEPOperator
+    SmallVector<std::tuple<Operator *, User *, GetElementPtrInst *>>
+        GEPReplaceMap;
+    for (auto &OldOp : GEPOps) {
+      SmallVector<Value *> Indices(OldOp->idx_begin(), OldOp->idx_end());
+      for (auto &OpUse : OldOp->uses()) {
+        User *Usr = OpUse.getUser();
+        Instruction *I = dyn_cast<Instruction>(Usr);
+        auto NewCall = BuiltinCallMap[I->getFunction()];
+        GetElementPtrInst *NewGEP = GetElementPtrInst::Create(
+            OldOp->getSourceElementType(), NewCall, Indices, "ncpu_gep", I);
+        GEPReplaceMap.emplace_back(OldOp, Usr, NewGEP);
+      }
+    }
+    for (auto &Entry : GEPReplaceMap) {
+      auto Op = std::get<0>(Entry);
+      auto Usr = std::get<1>(Entry);
+      auto NewGEP = std::get<2>(Entry);
+      Op->replaceUsesWithIf(NewGEP, [&](Use &U) {
+        bool res = U.getUser() == Usr;
+        return res;
+      });
+    }
+
+    // Finally, we erase the builtin from the module
     Glob->eraseFromParent();
   }
 
   for (auto F : NewKernels) {
     fixCallingConv(F);
   }
-  // todo: return preserved analyses instead of none
   return ModuleChanged ? PreservedAnalyses::none() : PreservedAnalyses::all();
 }
