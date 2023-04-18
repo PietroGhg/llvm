@@ -1,6 +1,8 @@
-// RUN: %clangxx -fsycl-device-only -fsycl-native-cpu -Xclang -fsycl-int-header=%t.h -Xclang -fsycl-native-cpu-header=%t-hc.h -o %t.bc %s 
+// Checks that kernelhandler and sunhandler are emitted in the integration headers.
+// The sycl-native-cpu helper header is always named <sycl-int-header>.hc
+// RUN: %clangxx -fsycl-device-only -fsycl-native-cpu -Xclang -fsycl-int-header=%t.h -o %t.bc %s 
 // RUN: FileCheck -input-file=%t.h %s --check-prefix=CHECK-H
-// RUN: FileCheck -input-file=%t-hc.h %s --check-prefix=CHECK-HC
+// RUN: FileCheck -input-file=%t.h.hc %s --check-prefix=CHECK-HC
 // Compiling generated main integration header to check correctness, -fsycl option used to find required includes 
 // RUN: %clangxx -fsycl -D __SYCL_NATIVE_CPU__ -c -x c++ %t.h
 

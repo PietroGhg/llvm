@@ -1,5 +1,5 @@
-// RUN: %clangxx -fsycl-device-only  -fsycl-native-cpu -Xclang -fsycl-int-header=%t.h -Xclang -fsycl-native-cpu-header=%t-hc.h -S -o %t.ll %s 
-// RUN: FileCheck -input-file=%t-hc.h %s 
+// RUN: %clangxx -fsycl-device-only  -fsycl-native-cpu -Xclang -fsycl-int-header=%t.h -S -o %t.ll %s 
+// RUN: FileCheck -input-file=%t.h.hc %s 
 // RUN: FileCheck -input-file=%t.ll %s --check-prefix=CHECK-LL
 // Compiling generated main integration header to check correctness, -fsycl option used to find required includes
 // RUN: %clangxx -fsycl -D __SYCL_NATIVE_CPU__ -c -x c++ %t.h

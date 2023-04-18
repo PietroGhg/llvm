@@ -6787,10 +6787,6 @@ def fsycl_int_footer : Separate<["-"], "fsycl-int-footer">,
   MarshallingInfoString<LangOpts<"SYCLIntFooter">>;
 def fsycl_int_footer_EQ : Joined<["-"], "fsycl-int-footer=">,
   Alias<fsycl_int_footer>;
-def fsycl_native_cpu_header : Separate<["-"], "fsycl-native-cpu-header">,
-  MarshallingInfoString<LangOpts<"SYCLNativeCPUHeader">>;
-def fsycl_native_cpu_header_EQ : Joined<["-"], "fsycl-native-cpu-header=">,
-  Alias<fsycl_native_cpu_header>;
 def fsycl_unique_prefix_EQ
     : Joined<["-"], "fsycl-unique-prefix=">,
       HelpText<"A unique prefix for this translation unit across devices, used "

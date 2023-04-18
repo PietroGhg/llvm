@@ -7014,20 +7014,20 @@ void Driver::BuildActions(Compilation &C, DerivedArgList &Args,
         TmpFileFooter = C.addTempFile(C.getArgs().MakeArgString(OutName));
       }
       addIntegrationFiles(TmpFileHeader, TmpFileFooter, SrcFileName);
-      if (isSYCLNativeCPU(Args)) {
-        std::string TmpFileNameHCHeader;
-        if (IsSaveTemps) {
-          TmpFileNameHCHeader.append(C.getDriver().GetUniquePath(
-              OutFileDir.c_str() + StemmedSrcFileName + "-hc-header", "h"));
-        } else {
-          TmpFileNameHCHeader.append(C.getDriver().GetTemporaryPath(
-              OutFileDir.c_str() + StemmedSrcFileName + "-hc-header", "h"));
-        }
+      //if (isSYCLNativeCPU(Args)) {
+      //  std::string TmpFileNameHCHeader;
+      //  if (IsSaveTemps) {
+      //    TmpFileNameHCHeader.append(C.getDriver().GetUniquePath(
+      //        OutFileDir.c_str() + StemmedSrcFileName + "-hc-header", "h"));
+      //  } else {
+      //    TmpFileNameHCHeader.append(C.getDriver().GetTemporaryPath(
+      //        OutFileDir.c_str() + StemmedSrcFileName + "-hc-header", "h"));
+      //  }
 
-        StringRef TmpHCHeader =
-            C.addTempFile(C.getArgs().MakeArgString(TmpFileNameHCHeader));
-        addIntegrationNativeCPUHeader(TmpHCHeader, SrcFileName);
-      }
+      //  StringRef TmpHCHeader =
+      //      C.addTempFile(C.getArgs().MakeArgString(TmpFileNameHCHeader));
+      //  addIntegrationNativeCPUHeader(TmpHCHeader, SrcFileName);
+      //}
     }
   }
 
