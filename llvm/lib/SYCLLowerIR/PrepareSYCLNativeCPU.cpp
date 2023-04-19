@@ -44,7 +44,10 @@ void fixCallingConv(Function* F) {
   // TODO: the frame-pointer=all attribute apparently makes the kernel crash at runtime
   F->setAttributes({});
 }
-Function *addArg(Function *oldF, Type *T) {
+
+// Clone the function and returns a new function with a new argument on type T added as 
+// last argument
+Function *cloneFunctionAndAddParam(Function *oldF, Type *T) {
   auto oldT = oldF->getFunctionType();
   auto retT = oldT->getReturnType();
 
