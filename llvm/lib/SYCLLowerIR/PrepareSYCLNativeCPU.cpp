@@ -38,6 +38,12 @@
 #include <functional>
 #include <numeric>
 #include <vector>
+#ifdef  __NATIVECPU_USE_DDK__
+#warning using ddk
+#include <compiler/utils/replace_atomic_funcs_pass.h>
+#else
+#error OHNO
+#endif
 
 using namespace llvm;
 
@@ -278,5 +284,7 @@ PreservedAnalyses PrepareSYCLNativeCPUPass::run(Module &M,
   for (auto &F : M) {
     fixCallingConv(&F);
   }
+  compiler::utils::ReplaceAtomicFuncsPass P;
+  P.run(M, MAM);
   return ModuleChanged ? PreservedAnalyses::none() : PreservedAnalyses::all();
 }

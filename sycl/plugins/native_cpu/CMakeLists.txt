@@ -23,14 +23,8 @@ if(Native_CPU_USE_DDK)
     set(CA_NATIVE_CPU 1)
     add_subdirectory(${oneapi-ck_SOURCE_DIR} ${oneapi-ck_BINARY_DIR})
   endif()
-  #run the equivalent of ninja abacus_bitcode64
-  #include(ExternalProject)
-  #  ExternalProject_Add(oneapi-ck
-  #    GIT_REPOSITORY https://github.com/PietroGhg/oneapi-construction-kit.git
-  #    GIT_TAG pietro/in-tree
-  #    CMAKE_GENERATOR Ninja
-  #    CMAKE_ARGS -DCA_LLVM_INSTALL_DIR=${CMAKE_INSTALL_PREFIX} -DCA_ENABLE_API=cl  -DSpirvTools_spirv-as_EXECUTABLE=/home/pietro/dpcpp_host_device/SPIRV-Tools/build/tools/spirv-as
-  #    BUILD_COMMAND ninja abacus_bitcode64
-  #    INSTALL_COMMAND ""
-  #  )
+  target_compile_definitions(LLVMSYCLLowerIR PRIVATE  __NATIVECPU_USE_DDK__)
+  target_include_directories(LLVMSYCLLowerIR PRIVATE ${oneapi-ck_SOURCE_DIR}/modules/compiler/utils/include)
+  target_link_libraries(LLVMSYCLLowerIR PRIVATE compiler-utils)
+  add_dependencies(pi_native_cpu abacus_bitcode64)
 endif()
