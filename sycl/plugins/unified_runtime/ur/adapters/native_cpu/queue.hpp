@@ -6,5 +6,16 @@
 //
 //===----------------------------------------------------------------------===//
 #pragma once
+#include "threadpool.hpp"
 
-struct ur_queue_handle_t_ {};
+struct ur_queue_handle_t_ {
+  native_cpu::simple_thread_pool tp;
+
+  ur_queue_handle_t_() {
+    tp.start();
+  }
+  
+  ~ur_queue_handle_t_() {
+    tp.stop();
+  }
+};

@@ -13,6 +13,8 @@
 #include "common.hpp"
 #include "kernel.hpp"
 #include "memory.hpp"
+#include "threadpool.hpp"
+#include "queue.hpp"
 
 sycl::detail::NDRDescT getNDRDesc(uint32_t WorkDim,
                                   const size_t *GlobalWorkOffset,
@@ -41,6 +43,8 @@ sycl::detail::NDRDescT getNDRDesc(uint32_t WorkDim,
   return Res;
 }
 
+
+
 UR_APIEXPORT ur_result_t UR_APICALL urEnqueueKernelLaunch(
     ur_queue_handle_t hQueue, ur_kernel_handle_t hKernel, uint32_t workDim,
     const size_t *pGlobalWorkOffset, const size_t *pGlobalWorkSize,
@@ -64,7 +68,10 @@ UR_APIEXPORT ur_result_t UR_APICALL urEnqueueKernelLaunch(
   // TODO: add proper event dep management
   sycl::detail::NDRDescT ndr =
       getNDRDesc(workDim, pGlobalWorkOffset, pGlobalWorkSize, pLocalWorkSize);
-  hKernel->handleLocalArgs();
+  auto& tp = hQueue->tp;
+  const size_t numParallelThreads = tp.num_threads();
+  hKernel->updateMemPool(numParallelThreads);
+  std::vector<std::future<void>> futures;
 
   __nativecpu_state state(ndr.GlobalSize[0], ndr.GlobalSize[1],
                           ndr.GlobalSize[2], ndr.LocalSize[0], ndr.LocalSize[1],
@@ -77,17 +84,25 @@ UR_APIEXPORT ur_result_t UR_APICALL urEnqueueKernelLaunch(
   for (unsigned g2 = 0; g2 < numWG2; g2++) {
     for (unsigned g1 = 0; g1 < numWG1; g1++) {
       for (unsigned g0 = 0; g0 < numWG0; g0++) {
+        futures.emplace_back(
+            native_cpu::schedule_host_task(tp, [state, hKernel, g0, g1, g2, &ndr, numParallelThreads](size_t threadId) mutable {
         for (unsigned local2 = 0; local2 < ndr.LocalSize[2]; local2++) {
           for (unsigned local1 = 0; local1 < ndr.LocalSize[1]; local1++) {
             for (unsigned local0 = 0; local0 < ndr.LocalSize[0]; local0++) {
+              hKernel->handleLocalArgs(numParallelThreads, 0);
               state.update(g0, g1, g2, local0, local1, local2);
               hKernel->_subhandler(hKernel->_args.data(), &state);
             }
           }
         }
+        }));
       }
     }
   }
+
+  for(auto& f : futures)
+    f.get();
+
   // TODO: we should avoid calling clear here by avoiding using push_back
   // in setKernelArgs.
   hKernel->_args.clear();

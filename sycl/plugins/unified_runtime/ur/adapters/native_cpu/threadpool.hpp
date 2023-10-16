@@ -1,0 +1,299 @@
+#pragma once 
+#include <algorithm>
+#include <atomic>
+#include <condition_variable>
+#include <cstdlib>
+#include <functional>
+#include <future>
+#include <mutex>
+#include <numeric>
+#include <queue>
+#include <sched.h>
+#include <string>
+#include <thread>
+#include <vector>
+#include <iostream>
+
+namespace native_cpu {
+
+
+/**
+ * Type of a basic task that can run on a worker thread
+ */
+using worker_task_t = std::function<void(size_t)>;
+
+/**
+ *  A thread that continuously waits for work. When tasks are scheduled
+ *        to it, they are added to a queue and the thread executes them
+ *        in-order. This class represents the main functionality of a thread
+ *        pool.
+ *
+ */
+class worker_thread {
+ public:
+  /**
+   *  Initializes state, but does not start the worker thread
+   */
+  worker_thread() noexcept : m_isRunning(false), m_numTasks(0) {}
+
+  /**
+   *  Creates and launches the worker thread
+   */
+  inline void start(size_t threadId) {
+    std::lock_guard<std::mutex> lock(m_workMutex);
+    if (this->is_running()) {
+      return;
+    }
+    m_threadId = threadId;
+    m_worker = std::thread([this]() {
+      while (true) {
+        // pin the thread to the cpu 
+        std::unique_lock<std::mutex> lock(m_workMutex);
+        // Wait until there's work available
+        m_startWorkCondition.wait(
+            lock, [this]() { return !this->is_running() || !m_tasks.empty(); });
+        if (!this->is_running() && m_tasks.empty()) {
+          // Can only break if there is no more work to be done
+          break;
+        }
+        // Retrieve a task from the queue
+        auto task = m_tasks.front();
+        m_tasks.pop();
+
+        // Not modifying internal state anymore, can release the mutex
+        lock.unlock();
+
+        // Execute the task
+        task(m_threadId);
+        --m_numTasks;
+      }
+    });
+
+    
+    m_isRunning = true;
+  }
+
+  /**
+   *  Schedules a task to be executed on the worker thread
+   *  task The task to execute
+   */
+  inline void schedule(const worker_task_t& task) {
+    {
+      std::lock_guard<std::mutex> lock(m_workMutex);
+      // Add the task to the queue
+      m_tasks.push(task);
+      ++m_numTasks;
+    }
+    m_startWorkCondition.notify_one();
+  }
+
+  /**
+   *  Returns the number of tasks currently waiting in the queue to be
+   *        executed.
+   */
+  size_t num_pending_tasks() const noexcept {
+    // m_numTasks is an atomic counter because we don't want to lock the mutex
+    // here, num_pending_tasks is only used for heuristics
+    return m_numTasks.load();
+  }
+
+  /**
+   *  Waits for all tasks to finish and destroys the worker thread
+   */
+  inline void stop() {
+    {
+      // Notify the worker thread to stop executing
+      std::lock_guard<std::mutex> lock(m_workMutex);
+      m_isRunning = false;
+    }
+    m_startWorkCondition.notify_all();
+    if (m_worker.joinable()) {
+      // Wait for the worker thread to finish handling the task queue
+      m_worker.join();
+    }
+  }
+
+  /**
+   *  Checks whether the thread pool is currently running threads
+   *  True if at threads are running
+   */
+  inline bool is_running() const noexcept { return m_isRunning; }
+
+ private:
+  size_t m_threadId;
+  /**
+   *  The thread that does all the work
+   */
+  std::thread m_worker;
+
+  /**
+   *  Mutex used for changing member variables across threads
+   */
+  std::mutex m_workMutex;
+
+  /**
+   *  Condition variable used for determining when work becomes available
+   */
+  std::condition_variable m_startWorkCondition;
+
+  /**
+   *  Determines whether the worker thread should be waiting for work
+   */
+  bool m_isRunning;
+
+  /**
+   *  A queue of tasks to be executed
+   */
+  std::queue<worker_task_t> m_tasks;
+
+  /**
+   *  The number of tasks waiting in the queue. The reason why this
+   *        doesn't just use m_tasks.size() is because of possible race
+   *        conditions if a mutex is not used (which it shouldn't for this).
+   */
+  std::atomic<size_t> m_numTasks;
+};
+
+/**
+ *  Implementation of a thread pool. The worker threads are created and
+ *        ready at construction. This class mainly holds the interface for
+ *        scheduling a task to the most appropriate thread and handling input
+ *        parameters and futures.
+ */
+class simple_thread_pool {
+ public:
+  /**
+   *  Constructs a thread pool
+   * @param numThreads The number of threads to use. Defaults to the number of
+   *        hardware threads.
+   */
+  simple_thread_pool(size_t numThreads = 0) noexcept : m_isRunning(false) {
+    this->resize(numThreads);
+  }
+
+  /**
+   *  Creates and launches the worker threads
+   */
+  inline void start() {
+    if (this->is_running()) {
+      return;
+    }
+    size_t threadId = 0;
+    for (auto& t : m_workers) {
+      t.start(threadId);
+      threadId++;
+    }
+    m_isRunning.store(true, std::memory_order_release);
+  }
+
+  /**
+   *  Waits for all tasks to finish and destroys the worker threads
+   */
+  inline void stop() {
+    for (auto& t : m_workers) {
+      t.stop();
+    }
+    m_isRunning.store(false, std::memory_order_release);
+  }
+
+  /**
+   *  Resizes the thread pool
+   * @param numThreads The number of threads to use. If zero, uses the number
+   *        of hardware threads.
+   */
+  inline void resize(size_t numThreads) noexcept {
+    if (numThreads == 0) {
+      numThreads = std::thread::hardware_concurrency();
+    }
+    char* envVar = std::getenv("SYCL_NATIVE_CPU_HOST_THREADS");
+    if(envVar){
+    	numThreads = std::stoul(envVar);
+    }
+    if (!this->is_running() && (numThreads != this->num_threads())) {
+      m_workers = decltype(m_workers)(numThreads);
+    }
+  }
+
+  /**
+   *  Schedules a task to run on one of the threads. Minor optimization
+   *        if the task is already a simple task.
+   * @param task The functor to execute on a thread
+   */
+  inline void schedule(const worker_task_t& task) {
+    // Schedule the task on the best available worker thread
+    this->best_worker().schedule(task);
+  }
+
+  /**
+   *  Checks whether the worker thread is running
+   *  True if the worker thread is running
+   */
+  inline bool is_running() const noexcept {
+    return m_isRunning.load(std::memory_order_acquire);
+  }
+
+  /**
+   *  Retrieves the number of threads used the thread pool
+   *  Number of threads in the thread pool
+   */
+  inline size_t num_threads() const noexcept { return m_workers.size(); }
+
+  /**
+   *  Retrieves the number of tasks waiting to be executed
+   *  Sum of the number of waiting tasks across all threads
+   */
+  inline size_t num_pending_tasks() const noexcept {
+    return std::accumulate(std::begin(m_workers), std::end(m_workers),
+                           size_t(0),
+                           [](size_t numTasks, const worker_thread& t) {
+                             return (numTasks + t.num_pending_tasks());
+                           });
+  }
+
+  /**
+   *  Waits for all tasks to finish
+   */
+  void wait_for_all_pending_tasks() {
+    while (num_pending_tasks() > 0) {
+      std::this_thread::yield();
+    }
+  }
+
+ protected:
+  /**
+   *  Determines which thread is the most appropriate for having work
+   *        scheduled
+   *  Reference to the optimal thread
+   */
+  worker_thread& best_worker() noexcept {
+    return *std::min_element(
+        std::begin(m_workers), std::end(m_workers),
+        [](const worker_thread& w1, const worker_thread& w2) {
+          // Prefer threads whose task queues are shorter
+          // This is just an approximation, it doesn't need to be exact
+          return (w1.num_pending_tasks() < w2.num_pending_tasks());
+        });
+  }
+
+ private:
+  /**
+   *  Storage for all the worker threads
+   */
+  std::vector<worker_thread> m_workers;
+
+  /**
+   *  Determines whether the worker threads should be waiting for work
+   */
+  std::atomic<bool> m_isRunning;
+};
+
+inline std::future<void> schedule_host_task(
+    native_cpu::simple_thread_pool& tp,
+    std::function<void(size_t)>&& task) {
+  auto workerTask = std::make_shared<std::packaged_task<void(size_t)>>(
+      [task](auto&& PH1) { return task(std::forward<decltype(PH1)>(PH1)); });
+  tp.schedule(
+      [=](size_t threadId) { (*workerTask)(threadId); });
+  return workerTask->get_future();
+}
+} // namespace native_cpu
