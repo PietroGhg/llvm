@@ -89,7 +89,7 @@ UR_APIEXPORT ur_result_t UR_APICALL urEnqueueKernelLaunch(
         for (unsigned local2 = 0; local2 < ndr.LocalSize[2]; local2++) {
           for (unsigned local1 = 0; local1 < ndr.LocalSize[1]; local1++) {
             for (unsigned local0 = 0; local0 < ndr.LocalSize[0]; local0++) {
-              hKernel->handleLocalArgs(numParallelThreads, 0);
+              hKernel->handleLocalArgs(numParallelThreads, threadId);
               state.update(g0, g1, g2, local0, local1, local2);
               hKernel->_subhandler(hKernel->_args.data(), &state);
             }
