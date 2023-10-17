@@ -287,9 +287,9 @@ class simple_thread_pool {
   std::atomic<bool> m_isRunning;
 };
 
-inline std::future<void> schedule_host_task(
-    native_cpu::simple_thread_pool& tp,
-    std::function<void(size_t)>&& task) {
+using task_t = std::function<void(size_t)>;
+
+inline std::future<void> schedule_task(simple_thread_pool &tp, task_t &&task) {
   auto workerTask = std::make_shared<std::packaged_task<void(size_t)>>(
       [task](auto&& PH1) { return task(std::forward<decltype(PH1)>(PH1)); });
   tp.schedule(
