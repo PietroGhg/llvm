@@ -22,6 +22,8 @@ namespace native_cpu {
  */
 using worker_task_t = std::function<void(size_t)>;
 
+namespace detail {
+
 /**
  *  A thread that continuously waits for work. When tasks are scheduled
  *        to it, they are added to a queue and the thread executes them
@@ -286,14 +288,37 @@ class simple_thread_pool {
    */
   std::atomic<bool> m_isRunning;
 };
+} // namespace detail
 
-using task_t = std::function<void(size_t)>;
 
-inline std::future<void> schedule_task(simple_thread_pool &tp, task_t &&task) {
-  auto workerTask = std::make_shared<std::packaged_task<void(size_t)>>(
-      [task](auto&& PH1) { return task(std::forward<decltype(PH1)>(PH1)); });
-  tp.schedule(
-      [=](size_t threadId) { (*workerTask)(threadId); });
-  return workerTask->get_future();
-}
+template <typename ThreadPoolT>
+class threadpool_interface {
+  ThreadPoolT threadpool;
+public:
+  void start() {
+    threadpool.start();
+  }
+
+  void stop() {
+    threadpool.stop();
+  }
+
+  size_t num_threads() const noexcept { 
+    return threadpool.num_threads();
+  }
+
+  threadpool_interface(size_t numThreads) : threadpool(numThreads) {}
+  threadpool_interface() : threadpool(0) {}
+
+  std::future<void> schedule_task(worker_task_t &&task) {
+    auto workerTask = std::make_shared<std::packaged_task<void(size_t)>>(
+        [task](auto&& PH1) { return task(std::forward<decltype(PH1)>(PH1)); });
+    threadpool.schedule(
+        [=](size_t threadId) { (*workerTask)(threadId); });
+    return workerTask->get_future();
+  }
+};
+
+using threadpool_t = threadpool_interface<detail::simple_thread_pool>;
+
 } // namespace native_cpu

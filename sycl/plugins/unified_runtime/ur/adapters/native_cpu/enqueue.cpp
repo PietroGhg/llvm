@@ -43,8 +43,6 @@ sycl::detail::NDRDescT getNDRDesc(uint32_t WorkDim,
   return Res;
 }
 
-
-
 UR_APIEXPORT ur_result_t UR_APICALL urEnqueueKernelLaunch(
     ur_queue_handle_t hQueue, ur_kernel_handle_t hKernel, uint32_t workDim,
     const size_t *pGlobalWorkOffset, const size_t *pGlobalWorkSize,
@@ -95,9 +93,8 @@ UR_APIEXPORT ur_result_t UR_APICALL urEnqueueKernelLaunch(
       for (unsigned g1 = 0; g1 < numWG1; g1++) {
         unsigned g0 = 0;
         for (; g0 < numWG0 - itemsPerThread; g0 += itemsPerThread) {
-          futures.emplace_back(native_cpu::schedule_task(
-              tp, [state, hKernel, g0, g1, g2, itemsPerThread,
-                   &ndr](size_t) mutable {
+          futures.emplace_back(tp.schedule_task(
+              [state, hKernel, g0, g1, g2, itemsPerThread, &ndr](size_t) mutable {
                 for (unsigned itemCount = 0; itemCount < itemsPerThread;
                      itemCount++) {
                   for (unsigned local2 = 0; local2 < ndr.LocalSize[2];
@@ -135,8 +132,8 @@ UR_APIEXPORT ur_result_t UR_APICALL urEnqueueKernelLaunch(
         for (unsigned g0 = 0; g0 < numWG0; g0++) {
           // Todo: this schedules one work group at a time, we could schedule
           // groups of work groups in order to reduce synchronization overhead.
-          futures.emplace_back(native_cpu::schedule_task(
-              tp, [state, hKernel, g0, g1, g2, numParallelThreads,
+          futures.emplace_back(tp.schedule_task(
+              [state, hKernel, g0, g1, g2, numParallelThreads,
                    &ndr](size_t threadId) mutable {
                 hKernel->handleLocalArgs(numParallelThreads, threadId);
                 for (unsigned local2 = 0; local2 < ndr.LocalSize[2]; local2++) {

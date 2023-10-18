@@ -9,7 +9,7 @@
 #include "threadpool.hpp"
 
 struct ur_queue_handle_t_ {
-  native_cpu::simple_thread_pool tp;
+  native_cpu::threadpool_t tp;
 
   ur_queue_handle_t_() {
     tp.start();
