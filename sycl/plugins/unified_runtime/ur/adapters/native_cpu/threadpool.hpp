@@ -1,3 +1,10 @@
+//===----------- threadpool.hpp - Native CPU Threadpool --------------------===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
 #pragma once 
 #include <algorithm>
 #include <atomic>
@@ -17,30 +24,18 @@
 namespace native_cpu {
 
 
-/**
- * Type of a basic task that can run on a worker thread
- */
 using worker_task_t = std::function<void(size_t)>;
 
 namespace detail {
 
-/**
- *  A thread that continuously waits for work. When tasks are scheduled
- *        to it, they are added to a queue and the thread executes them
- *        in-order. This class represents the main functionality of a thread
- *        pool.
- *
- */
 class worker_thread {
  public:
-  /**
-   *  Initializes state, but does not start the worker thread
-   */
+  
+  // Initializes state, but does not start the worker thread
   worker_thread() noexcept : m_isRunning(false), m_numTasks(0) {}
 
-  /**
-   *  Creates and launches the worker thread
-   */
+  
+  // Creates and launches the worker thread
   inline void start(size_t threadId) {
     std::lock_guard<std::mutex> lock(m_workMutex);
     if (this->is_running()) {
@@ -75,10 +70,6 @@ class worker_thread {
     m_isRunning = true;
   }
 
-  /**
-   *  Schedules a task to be executed on the worker thread
-   *  task The task to execute
-   */
   inline void schedule(const worker_task_t& task) {
     {
       std::lock_guard<std::mutex> lock(m_workMutex);
@@ -89,19 +80,14 @@ class worker_thread {
     m_startWorkCondition.notify_one();
   }
 
-  /**
-   *  Returns the number of tasks currently waiting in the queue to be
-   *        executed.
-   */
   size_t num_pending_tasks() const noexcept {
     // m_numTasks is an atomic counter because we don't want to lock the mutex
     // here, num_pending_tasks is only used for heuristics
     return m_numTasks.load();
   }
 
-  /**
-   *  Waits for all tasks to finish and destroys the worker thread
-   */
+  
+  // Waits for all tasks to finish and destroys the worker thread
   inline void stop() {
     {
       // Notify the worker thread to stop executing
@@ -115,67 +101,39 @@ class worker_thread {
     }
   }
 
-  /**
-   *  Checks whether the thread pool is currently running threads
-   *  True if at threads are running
-   */
+  
+  // Checks whether the thread pool is currently running threads
   inline bool is_running() const noexcept { return m_isRunning; }
 
  private:
+  // Unique ID identifying the thread in the threadpool
   size_t m_threadId;
-  /**
-   *  The thread that does all the work
-   */
   std::thread m_worker;
 
-  /**
-   *  Mutex used for changing member variables across threads
-   */
   std::mutex m_workMutex;
 
-  /**
-   *  Condition variable used for determining when work becomes available
-   */
   std::condition_variable m_startWorkCondition;
 
-  /**
-   *  Determines whether the worker thread should be waiting for work
-   */
   bool m_isRunning;
 
-  /**
-   *  A queue of tasks to be executed
-   */
   std::queue<worker_task_t> m_tasks;
 
-  /**
-   *  The number of tasks waiting in the queue. The reason why this
-   *        doesn't just use m_tasks.size() is because of possible race
-   *        conditions if a mutex is not used (which it shouldn't for this).
-   */
   std::atomic<size_t> m_numTasks;
 };
 
-/**
- *  Implementation of a thread pool. The worker threads are created and
- *        ready at construction. This class mainly holds the interface for
- *        scheduling a task to the most appropriate thread and handling input
- *        parameters and futures.
- */
+
+// Implementation of a thread pool. The worker threads are created and
+//       ready at construction. This class mainly holds the interface for
+//       scheduling a task to the most appropriate thread and handling input
+//       parameters and futures.
 class simple_thread_pool {
  public:
-  /**
-   *  Constructs a thread pool
-   * @param numThreads The number of threads to use. Defaults to the number of
-   *        hardware threads.
-   */
   simple_thread_pool(size_t numThreads = 0) noexcept : m_isRunning(false) {
     this->resize(numThreads);
   }
 
-  /**
-   *  Creates and launches the worker threads
-   */
+  
+  // Creates and launches the worker threads
   inline void start() {
     if (this->is_running()) {
       return;
@@ -188,9 +146,8 @@ class simple_thread_pool {
     m_isRunning.store(true, std::memory_order_release);
   }
 
-  /**
-   *  Waits for all tasks to finish and destroys the worker threads
-   */
+  
+  // Waits for all tasks to finish and destroys the worker threads
   inline void stop() {
     for (auto& t : m_workers) {
       t.stop();
@@ -198,11 +155,6 @@ class simple_thread_pool {
     m_isRunning.store(false, std::memory_order_release);
   }
 
-  /**
-   *  Resizes the thread pool
-   * @param numThreads The number of threads to use. If zero, uses the number
-   *        of hardware threads.
-   */
   inline void resize(size_t numThreads) noexcept {
     if (numThreads == 0) {
       numThreads = std::thread::hardware_concurrency();
@@ -216,34 +168,17 @@ class simple_thread_pool {
     }
   }
 
-  /**
-   *  Schedules a task to run on one of the threads. Minor optimization
-   *        if the task is already a simple task.
-   * @param task The functor to execute on a thread
-   */
   inline void schedule(const worker_task_t& task) {
     // Schedule the task on the best available worker thread
     this->best_worker().schedule(task);
   }
 
-  /**
-   *  Checks whether the worker thread is running
-   *  True if the worker thread is running
-   */
   inline bool is_running() const noexcept {
     return m_isRunning.load(std::memory_order_acquire);
   }
 
-  /**
-   *  Retrieves the number of threads used the thread pool
-   *  Number of threads in the thread pool
-   */
   inline size_t num_threads() const noexcept { return m_workers.size(); }
 
-  /**
-   *  Retrieves the number of tasks waiting to be executed
-   *  Sum of the number of waiting tasks across all threads
-   */
   inline size_t num_pending_tasks() const noexcept {
     return std::accumulate(std::begin(m_workers), std::end(m_workers),
                            size_t(0),
@@ -252,9 +187,6 @@ class simple_thread_pool {
                            });
   }
 
-  /**
-   *  Waits for all tasks to finish
-   */
   void wait_for_all_pending_tasks() {
     while (num_pending_tasks() > 0) {
       std::this_thread::yield();
@@ -262,11 +194,8 @@ class simple_thread_pool {
   }
 
  protected:
-  /**
-   *  Determines which thread is the most appropriate for having work
-   *        scheduled
-   *  Reference to the optimal thread
-   */
+  // Determines which thread is the most appropriate for having work
+  // scheduled
   worker_thread& best_worker() noexcept {
     return *std::min_element(
         std::begin(m_workers), std::end(m_workers),
@@ -278,14 +207,8 @@ class simple_thread_pool {
   }
 
  private:
-  /**
-   *  Storage for all the worker threads
-   */
   std::vector<worker_thread> m_workers;
 
-  /**
-   *  Determines whether the worker threads should be waiting for work
-   */
   std::atomic<bool> m_isRunning;
 };
 } // namespace detail
