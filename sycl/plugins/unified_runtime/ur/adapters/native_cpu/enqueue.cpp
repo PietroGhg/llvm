@@ -94,34 +94,18 @@ UR_APIEXPORT ur_result_t UR_APICALL urEnqueueKernelLaunch(
         unsigned g0 = 0;
         for (; g0 < numWG0 - itemsPerThread; g0 += itemsPerThread) {
           futures.emplace_back(tp.schedule_task(
-              [state, hKernel, g0, g1, g2, itemsPerThread, &ndr](size_t) mutable {
+              [state, hKernel, g0, g1, g2, itemsPerThread](size_t) mutable {
                 for (unsigned itemCount = 0; itemCount < itemsPerThread;
                      itemCount++) {
-                  for (unsigned local2 = 0; local2 < ndr.LocalSize[2];
-                       local2++) {
-                    for (unsigned local1 = 0; local1 < ndr.LocalSize[1];
-                         local1++) {
-                      for (unsigned local0 = 0; local0 < ndr.LocalSize[0];
-                           local0++) {
-                        state.update(g0 + itemCount, g1, g2, local0, local1,
-                                     local2);
-                        hKernel->_subhandler(hKernel->_args.data(), &state);
-                      }
-                    }
-                  }
+                  state.update(g0 + itemCount, g1, g2, 0, 0, 0);
+                  hKernel->_subhandler(hKernel->_args.data(), &state);
                 }
               }));
         }
         // peel
         for (; g0 < numWG0; g0++) {
-          for (unsigned local2 = 0; local2 < ndr.LocalSize[2]; local2++) {
-            for (unsigned local1 = 0; local1 < ndr.LocalSize[1]; local1++) {
-              for (unsigned local0 = 0; local0 < ndr.LocalSize[0]; local0++) {
-                state.update(g0, g1, g2, local0, local1, local2);
-                hKernel->_subhandler(hKernel->_args.data(), &state);
-              }
-            }
-          }
+          state.update(g0, g1, g2, 0, 0, 0);
+          hKernel->_subhandler(hKernel->_args.data(), &state);
         }
       }
     }
