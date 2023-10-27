@@ -15,7 +15,6 @@
 #include <mutex>
 #include <numeric>
 #include <queue>
-#include <sched.h>
 #include <string>
 #include <thread>
 #include <vector>
