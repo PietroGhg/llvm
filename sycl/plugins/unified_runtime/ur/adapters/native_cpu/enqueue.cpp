@@ -68,6 +68,7 @@ static void runWorkGroupLoops(const sycl::detail::NDRDescT &ndr,
     for (unsigned g1 = 0; g1 < numWG1; g1++) {
       for (unsigned g0 = 0; g0 < numWG0; g0++) {
 #ifdef NATIVECPU_USE_OCK
+        hKernel->handleLocalArgs(1, 0);
         state.update(g0, g1, g2);
         hKernel->_subhandler(hKernel->_args.data(), &state);
 #else
@@ -159,19 +160,11 @@ UR_APIEXPORT ur_result_t UR_APICALL urEnqueueKernelLaunch(
           // Todo: this schedules one work group at a time, we could schedule
           // groups of work groups in order to reduce synchronization overhead.
           futures.emplace_back(tp.schedule_task(
-              [state, kernel = *hKernel, g0, g1, g2, numParallelThreads,
-                   &ndr](size_t threadId) mutable {
+              [state, kernel = *hKernel, g0, g1, g2, numParallelThreads
+                   ](size_t threadId) mutable {
                 kernel.handleLocalArgs(numParallelThreads, threadId);
-                for (unsigned local2 = 0; local2 < ndr.LocalSize[2]; local2++) {
-                  for (unsigned local1 = 0; local1 < ndr.LocalSize[1];
-                       local1++) {
-                    for (unsigned local0 = 0; local0 < ndr.LocalSize[0];
-                         local0++) {
-                      state.update(g0, g1, g2, local0, local1, local2);
+                      state.update(g0, g1, g2);
                       kernel._subhandler(kernel._args.data(), &state);
-                    }
-                  }
-                }
               }));
         }
       }
