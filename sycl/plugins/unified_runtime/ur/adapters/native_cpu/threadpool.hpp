@@ -154,13 +154,13 @@ class simple_thread_pool {
     m_isRunning.store(false, std::memory_order_release);
   }
 
-  inline void resize(size_t numThreads) noexcept {
-    if (numThreads == 0) {
-      numThreads = std::thread::hardware_concurrency();
-    }
+  inline void resize(size_t numThreads) {
     char* envVar = std::getenv("SYCL_NATIVE_CPU_HOST_THREADS");
     if(envVar){
     	numThreads = std::stoul(envVar);
+    }
+    if (numThreads == 0) {
+      numThreads = std::thread::hardware_concurrency();
     }
     if (!this->is_running() && (numThreads != this->num_threads())) {
       m_workers = decltype(m_workers)(numThreads);
