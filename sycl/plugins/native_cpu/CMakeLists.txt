@@ -1,3 +1,4 @@
+find_package(Threads REQUIRED)
 add_sycl_plugin(native_cpu
   SOURCES
     "pi_native_cpu.cpp"
@@ -34,6 +35,7 @@ add_sycl_plugin(native_cpu
     ${CMAKE_CURRENT_SOURCE_DIR}/../unified_runtime
   LIBRARIES
     sycl
+    Threads::Threads
     UnifiedRuntime-Headers
 )
 

@@ -35,16 +35,29 @@ struct ur_kernel_handle_t_ : RefCounted {
   std::vector<local_arg_info_t> _localArgInfo;
 
   // To be called before enqueing the kernel.
-  void handleLocalArgs() {
-    updateMemPool();
+  void updateMemPool(size_t numParallelThreads) {
+    // compute requested size.
+    size_t reqSize = 0;
+    for (auto &entry : _localArgInfo) {
+      reqSize += entry.argSize * numParallelThreads;
+    }
+    if (reqSize == 0 || reqSize == _localMemPoolSize) {
+      return;
+    }
+    // realloc handles nullptr case
+    _localMemPool = realloc(_localMemPool, reqSize);
+    _localMemPoolSize = reqSize;
+  }
+
+  // To be called before executing a work group
+  void handleLocalArgs(size_t numParallelThread, size_t threadId) {
+    // For each local argument we have size*numthreads
     size_t offset = 0;
     for (auto &entry : _localArgInfo) {
       _args[entry.argIndex].MPtr =
-          reinterpret_cast<char *>(_localMemPool) + offset;
+          reinterpret_cast<char *>(_localMemPool) + offset + (entry.argSize * threadId);
       // update offset in the memory pool
-      // Todo: update this offset computation when we have work-group
-      // level parallelism.
-      offset += entry.argSize;
+      offset += entry.argSize * numParallelThread;
     }
   }
 
@@ -55,24 +68,6 @@ struct ur_kernel_handle_t_ : RefCounted {
   }
 
 private:
-  void updateMemPool() {
-    // compute requested size.
-    // Todo: currently we execute only one work-group at a time, so for each
-    // local arg we can allocate just 1 * argSize local arg. When we implement
-    // work-group level parallelism we should allocate N * argSize where N is
-    // the number of work groups being executed in parallel (e.g. number of
-    // threads in the thread pool).
-    size_t reqSize = 0;
-    for (auto &entry : _localArgInfo) {
-      reqSize += entry.argSize;
-    }
-    if (reqSize == 0 || reqSize == _localMemPoolSize) {
-      return;
-    }
-    // realloc handles nullptr case
-    _localMemPool = realloc(_localMemPool, reqSize);
-    _localMemPoolSize = reqSize;
-  }
   void *_localMemPool = nullptr;
   size_t _localMemPoolSize = 0;
 };

@@ -13,6 +13,8 @@
 #include "common.hpp"
 #include "kernel.hpp"
 #include "memory.hpp"
+#include "threadpool.hpp"
+#include "queue.hpp"
 
 sycl::detail::NDRDescT getNDRDesc(uint32_t WorkDim,
                                   const size_t *GlobalWorkOffset,
@@ -106,10 +108,78 @@ UR_APIEXPORT ur_result_t UR_APICALL urEnqueueKernelLaunch(
   // TODO: add proper event dep management
   sycl::detail::NDRDescT ndr =
       getNDRDesc(workDim, pGlobalWorkOffset, pGlobalWorkSize, pLocalWorkSize);
-  hKernel->handleLocalArgs();
+  auto& tp = hQueue->tp;
+  const size_t numParallelThreads = tp.num_threads();
+  hKernel->updateMemPool(numParallelThreads);
+  std::vector<std::future<void>> futures;
+  auto numWG0 = ndr.GlobalSize[0] / ndr.LocalSize[0];
+  auto numWG1 = ndr.GlobalSize[1] / ndr.LocalSize[1];
+  auto numWG2 = ndr.GlobalSize[2] / ndr.LocalSize[2];
+  bool isLocalSizeOne =
+      ndr.LocalSize[0] == 1 && ndr.LocalSize[1] == 1 && ndr.LocalSize[2] == 1;
+  __nativecpu_state state(ndr.GlobalSize[0], ndr.GlobalSize[1],
+                          ndr.GlobalSize[2], ndr.LocalSize[0], ndr.LocalSize[1],
+                          ndr.LocalSize[2], ndr.GlobalOffset[0],
+                          ndr.GlobalOffset[1], ndr.GlobalOffset[2]);
+  if (isLocalSizeOne) {
+    // If the local size is one, we make the assumption that we are running a
+    // parallel_for over a sycl::range Todo: we could add compiler checks and
+    // kernel properties for this (e.g. check that no barriers are called, no
+    // local memory args).
 
-  runWorkGroupLoops(ndr, hKernel);
+    // Todo: this assumes that dim 0 is the best dimension over which we want to
+    // parallelize
+    size_t itemsPerThread = numWG0 / numParallelThreads;
+    itemsPerThread = itemsPerThread > 0 ? itemsPerThread : 1;
+    for (unsigned g2 = 0; g2 < numWG2; g2++) {
+      for (unsigned g1 = 0; g1 < numWG1; g1++) {
+        unsigned g0 = 0;
+        for (; g0 < numWG0 - itemsPerThread; g0 += itemsPerThread) {
+          futures.emplace_back(tp.schedule_task(
+              [state, hKernel, g0, g1, g2, itemsPerThread](size_t) mutable {
+                for (unsigned itemCount = 0; itemCount < itemsPerThread;
+                     itemCount++) {
+                  state.update(g0 + itemCount, g1, g2, 0, 0, 0);
+                  hKernel->_subhandler(hKernel->_args.data(), &state);
+                }
+              }));
+        }
+        // peel
+        for (; g0 < numWG0; g0++) {
+          state.update(g0, g1, g2, 0, 0, 0);
+          hKernel->_subhandler(hKernel->_args.data(), &state);
+        }
+      }
+    }
 
+  } else {
+    for (unsigned g2 = 0; g2 < numWG2; g2++) {
+      for (unsigned g1 = 0; g1 < numWG1; g1++) {
+        for (unsigned g0 = 0; g0 < numWG0; g0++) {
+          // Todo: this schedules one work group at a time, we could schedule
+          // groups of work groups in order to reduce synchronization overhead.
+          futures.emplace_back(tp.schedule_task(
+              [state, hKernel, g0, g1, g2, numParallelThreads,
+                   &ndr](size_t threadId) mutable {
+                hKernel->handleLocalArgs(numParallelThreads, threadId);
+                for (unsigned local2 = 0; local2 < ndr.LocalSize[2]; local2++) {
+                  for (unsigned local1 = 0; local1 < ndr.LocalSize[1];
+                       local1++) {
+                    for (unsigned local0 = 0; local0 < ndr.LocalSize[0];
+                         local0++) {
+                      state.update(g0, g1, g2, local0, local1, local2);
+                      hKernel->_subhandler(hKernel->_args.data(), &state);
+                    }
+                  }
+                }
+              }));
+        }
+      }
+    }
+  }
+
+  for (auto &f : futures)
+    f.get();
   // TODO: we should avoid calling clear here by avoiding using push_back
   // in setKernelArgs.
   hKernel->_args.clear();

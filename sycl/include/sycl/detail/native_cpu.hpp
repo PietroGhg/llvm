@@ -72,6 +72,7 @@ struct __nativecpu_state {
     MGlobal_id[2] =
         MWorkGroup_size[2] * MWorkGroup_id[2] + MLocal_id[2] + MGlobalOffset[2];
   }
+
 };
 #ifdef __SYCL_DEVICE_ONLY__
 #define __SYCL_NCPU_GLOBAL_AS __attribute((address_space(1)))

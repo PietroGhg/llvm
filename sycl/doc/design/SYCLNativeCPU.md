@@ -79,6 +79,12 @@ Note that a number of `e2e` tests are currently still failing.
 
 ### Please note that Windows support is temporarily disabled due to some implementation details, it will be reinstantiated soon.
 
+# Environment variables
+
+Some environment variables con be used to chage runtime behaviours of the SYCL Native CPU plug-in:
+
+* `SYCL_NATIVE_CPU_HOST_THREADS`: sets the number of threads to be used by the threadpool that executes kernels. Defaults to `std::thread::hardware_concurrency()`.
+
 # Technical details
 
 The following section gives a brief overview of how a simple SYCL application is compiled for the Native CPU target. Consider the following SYCL sample, which performs vector addition using USM:
