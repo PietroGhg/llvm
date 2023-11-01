@@ -38,7 +38,7 @@ python buildbot/configure.py \
 # other options here
 ```
 
-SYCL Native CPU uses the [oneAPI Construction Kit](https://github.com/codeplaysoftware/oneapi-construction-kit) (OCK) in order to support some core SYCL functionalities and improve performances, the OCK is fetched by default when Native CPU is enabled, and can optionally be disabled using the `NATIVE_CPU_USE_OCK` CMake variable (please note that disabling the OCK will result in limited functionalities and performances on the Native CPU backend):
+SYCL Native CPU uses the [oneAPI Construction Kit](https://github.com/codeplaysoftware/oneapi-construction-kit) (OCK) in order to support some core SYCL functionalities and improve performances, the OCK is fetched by default when Native CPU is enabled, and can optionally be disabled using the `NATIVECPU_USE_OCK` CMake variable (please note that disabling the OCK will result in limited functionalities and performances on the Native CPU backend):
 
 ```
 python3 buildbot/configure.py \
