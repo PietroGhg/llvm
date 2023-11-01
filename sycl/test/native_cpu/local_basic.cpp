@@ -38,6 +38,6 @@ int test(queue q, const unsigned localSize) {
 int main() {
   queue q;
   auto res1 = test(q, 10);
-  auto res2 = test(q, 20);
+  auto res2 = test(q, 20000);
   return res1 || res2;
 }

@@ -117,16 +117,16 @@ UR_APIEXPORT ur_result_t UR_APICALL urEnqueueKernelLaunch(
           // Todo: this schedules one work group at a time, we could schedule
           // groups of work groups in order to reduce synchronization overhead.
           futures.emplace_back(tp.schedule_task(
-              [state, hKernel, g0, g1, g2, numParallelThreads,
+              [state, kernel = *hKernel, g0, g1, g2, numParallelThreads,
                    &ndr](size_t threadId) mutable {
-                hKernel->handleLocalArgs(numParallelThreads, threadId);
+                kernel.handleLocalArgs(numParallelThreads, threadId);
                 for (unsigned local2 = 0; local2 < ndr.LocalSize[2]; local2++) {
                   for (unsigned local1 = 0; local1 < ndr.LocalSize[1];
                        local1++) {
                     for (unsigned local0 = 0; local0 < ndr.LocalSize[0];
                          local0++) {
                       state.update(g0, g1, g2, local0, local1, local2);
-                      hKernel->_subhandler(hKernel->_args.data(), &state);
+                      kernel._subhandler(kernel._args.data(), &state);
                     }
                   }
                 }
