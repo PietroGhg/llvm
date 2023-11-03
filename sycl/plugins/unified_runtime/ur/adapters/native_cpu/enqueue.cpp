@@ -43,49 +43,6 @@ sycl::detail::NDRDescT getNDRDesc(uint32_t WorkDim,
   return Res;
 }
 
-static void runWorkGroupLoops(const sycl::detail::NDRDescT &ndr,
-                              ur_kernel_handle_t hKernel) {
-
-  __nativecpu_state state(ndr.GlobalSize[0], ndr.GlobalSize[1],
-                          ndr.GlobalSize[2], ndr.LocalSize[0], ndr.LocalSize[1],
-                          ndr.LocalSize[2], ndr.GlobalOffset[0],
-                          ndr.GlobalOffset[1], ndr.GlobalOffset[2]);
-
-  auto numWG0 = ndr.GlobalSize[0] / ndr.LocalSize[0];
-  auto numWG1 = ndr.GlobalSize[1] / ndr.LocalSize[1];
-  auto numWG2 = ndr.GlobalSize[2] / ndr.LocalSize[2];
-  const bool localSizeOne = ndr.LocalSize[0] == 1 && ndr.LocalSize[1] == 1 && ndr.LocalSize[2] == 1;
-  if(localSizeOne) {
-    // put everything in one work group, this is just an experiment
-    state.MWorkGroup_size[0] = numWG0;
-    state.MWorkGroup_size[1] = numWG1;
-    state.MWorkGroup_size[2] = numWG2;
-    numWG0 = 1;
-    numWG1 = 1;
-    numWG2 = 1;
-  }
-  for (unsigned g2 = 0; g2 < numWG2; g2++) {
-    for (unsigned g1 = 0; g1 < numWG1; g1++) {
-      for (unsigned g0 = 0; g0 < numWG0; g0++) {
-#ifdef NATIVECPU_USE_OCK
-        hKernel->handleLocalArgs(1, 0);
-        state.update(g0, g1, g2);
-        hKernel->_subhandler(hKernel->_args.data(), &state);
-#else
-        for (unsigned local2 = 0; local2 < ndr.LocalSize[2]; local2++) {
-          for (unsigned local1 = 0; local1 < ndr.LocalSize[1]; local1++) {
-            for (unsigned local0 = 0; local0 < ndr.LocalSize[0]; local0++) {
-              state.update(g0, g1, g2, local0, local1, local2);
-              hKernel->_subhandler(hKernel->_args.data(), &state);
-            }
-          }
-        }
-#endif
-      }
-    }
-  }
-}
-
 UR_APIEXPORT ur_result_t UR_APICALL urEnqueueKernelLaunch(
     ur_queue_handle_t hQueue, ur_kernel_handle_t hKernel, uint32_t workDim,
     const size_t *pGlobalWorkOffset, const size_t *pGlobalWorkSize,
@@ -130,24 +87,38 @@ UR_APIEXPORT ur_result_t UR_APICALL urEnqueueKernelLaunch(
 
     // Todo: this assumes that dim 0 is the best dimension over which we want to
     // parallelize
-    size_t itemsPerThread = numWG0 / numParallelThreads;
+
+    // Sice we also vectorize the kernel, and vectorization happens within the 
+    // work group loop, it's better to have a large-ish local size. We can 
+    // divide the global range by the number of threads, set that as the local size 
+    // and peel everything else.
+
+    size_t new_num_work_groups_0 = numParallelThreads;
+    size_t itemsPerThread = ndr.GlobalSize[0] / numParallelThreads;
+  __nativecpu_state fake_state(new_num_work_groups_0, ndr.GlobalSize[1],
+                            ndr.GlobalSize[2], itemsPerThread, ndr.LocalSize[1],
+                            ndr.LocalSize[2], ndr.GlobalOffset[0],
+                            ndr.GlobalOffset[1], ndr.GlobalOffset[2]);
+    if(false) {
+      std::cout << "global_size_0 " << ndr.GlobalSize[0] << "\n";
+      std::cout << "itemsPerThread "  << itemsPerThread << "\n";
+      std::cout << "new_num_work_groups_0 " << new_num_work_groups_0 << "\n";
+      std::cout << "peel start: " << new_num_work_groups_0*itemsPerThread << "\n";
+    }
+  
     itemsPerThread = itemsPerThread > 0 ? itemsPerThread : 1;
     for (unsigned g2 = 0; g2 < numWG2; g2++) {
       for (unsigned g1 = 0; g1 < numWG1; g1++) {
-        unsigned g0 = 0;
-        for (; g0 < numWG0 - itemsPerThread; g0 += itemsPerThread) {
+        for ( unsigned g0 = 0; g0 < new_num_work_groups_0; g0 += 1) {
           futures.emplace_back(tp.schedule_task(
-              [state, hKernel, g0, g1, g2, itemsPerThread](size_t) mutable {
-                for (unsigned itemCount = 0; itemCount < itemsPerThread;
-                     itemCount++) {
-                  state.update(g0 + itemCount, g1, g2, 0, 0, 0);
-                  hKernel->_subhandler(hKernel->_args.data(), &state);
-                }
+              [fake_state, hKernel, g0, g1, g2](size_t) mutable {
+                  fake_state.update(g0, g1, g2);
+                  hKernel->_subhandler(hKernel->_args.data(), &fake_state);
               }));
         }
         // peel
-        for (; g0 < numWG0; g0++) {
-          state.update(g0, g1, g2, 0, 0, 0);
+        for (unsigned g0 = new_num_work_groups_0*itemsPerThread; g0 < numWG0; g0++) {
+          state.update(g0, g1, g2);
           hKernel->_subhandler(hKernel->_args.data(), &state);
         }
       }
