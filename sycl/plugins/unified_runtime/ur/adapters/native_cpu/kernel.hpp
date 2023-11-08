@@ -39,13 +39,17 @@ struct ur_kernel_handle_t_ : RefCounted {
   ur_kernel_handle_t_(const char *name, nativecpu_task_t subhandler)
       : _name{name}, _subhandler{subhandler} {}
 
-  ur_kernel_handle_t_(const ur_kernel_handle_t_& other) {
-    _name = other._name;
-    _subhandler = other._subhandler;
-    _args = other._args;
-    _localArgInfo = other._localArgInfo;
-    _localMemPool = other._localMemPool;
-    _localMemPoolSize = other._localMemPoolSize;
+  ur_kernel_handle_t_(const ur_kernel_handle_t_& other) : _name(other._name), _subhandler(other._subhandler), 
+  _args(other._args), _localArgInfo(other._localArgInfo), _localMemPool(other._localMemPool), _localMemPoolSize(other._localMemPoolSize) {
+    incrementReferenceCount();
+  }
+
+  ~ur_kernel_handle_t_() {
+    decrementReferenceCount();
+    if (_refCount == 0) {
+      free(_localMemPool);
+    }
+  
   }
 
   const char *_name;
@@ -64,8 +68,7 @@ struct ur_kernel_handle_t_ : RefCounted {
       return;
     }
     // realloc handles nullptr case
-    char *newPtr = (char*)realloc(_localMemPool.get(), reqSize);
-    _localMemPool.reset(newPtr);
+    _localMemPool = (char*)realloc(_localMemPool, reqSize);
     _localMemPoolSize = reqSize;
   }
 
@@ -75,13 +78,13 @@ struct ur_kernel_handle_t_ : RefCounted {
     size_t offset = 0;
     for (auto &entry : _localArgInfo) {
       _args[entry.argIndex].MPtr =
-          _localMemPool.get() + offset + (entry.argSize * threadId);
+          _localMemPool + offset + (entry.argSize * threadId);
       // update offset in the memory pool
       offset += entry.argSize * numParallelThread;
     }
   }
 
 private:
-  std::shared_ptr<char> _localMemPool = nullptr;
+  char* _localMemPool = nullptr;
   size_t _localMemPoolSize = 0;
 };
