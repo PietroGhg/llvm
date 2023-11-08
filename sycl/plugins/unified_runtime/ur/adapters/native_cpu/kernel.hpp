@@ -8,7 +8,6 @@
 
 #pragma once
 
-#include <memory>
 #include "common.hpp"
 #include "nativecpu_state.hpp"
 #include <ur_api.h>

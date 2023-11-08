@@ -6,16 +6,11 @@
 //
 //===----------------------------------------------------------------------===//
 #pragma once
-#include "threadpool.hpp"
+#include "device.hpp"
 
 struct ur_queue_handle_t_ {
-  native_cpu::threadpool_t tp;
+  ur_device_handle_t_ *device;
 
-  ur_queue_handle_t_() {
-    tp.start();
-  }
+  ur_queue_handle_t_(ur_device_handle_t_ *device) :device(device) {}
   
-  ~ur_queue_handle_t_() {
-    tp.stop();
-  }
 };
