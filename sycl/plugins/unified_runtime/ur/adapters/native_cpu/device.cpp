@@ -6,6 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <cstdint>
 #include <ur_api.h>
 
 #include "platform.hpp"
@@ -98,7 +99,8 @@ UR_APIEXPORT ur_result_t UR_APICALL urDeviceGetInfo(ur_device_handle_t hDevice,
   case UR_DEVICE_INFO_LINKER_AVAILABLE:
     return ReturnValue(bool{false});
   case UR_DEVICE_INFO_MAX_COMPUTE_UNITS:
-    return ReturnValue(uint32_t{256});
+    // todo: return number of threads in theadpool
+    return ReturnValue(static_cast<uint32_t>(hDevice->tp.num_threads()));
   case UR_DEVICE_INFO_PARTITION_MAX_SUB_DEVICES:
     return ReturnValue(uint32_t{0});
   case UR_DEVICE_INFO_SUPPORTED_PARTITIONS:
@@ -345,12 +347,9 @@ UR_APIEXPORT ur_result_t UR_APICALL urDeviceCreateWithNativeHandle(
     ur_native_handle_t hNativeDevice, ur_platform_handle_t hPlatform,
     const ur_device_native_properties_t *pProperties,
     ur_device_handle_t *phDevice) {
-  std::ignore = hNativeDevice;
-  std::ignore = hPlatform;
-  std::ignore = pProperties;
-  std::ignore = phDevice;
+  *phDevice = new ur_device_handle_t_(hPlatform);
 
-  DIE_NO_IMPLEMENTATION;
+  return UR_RESULT_SUCCESS;
 }
 
 UR_APIEXPORT ur_result_t UR_APICALL urDeviceGetGlobalTimestamps(

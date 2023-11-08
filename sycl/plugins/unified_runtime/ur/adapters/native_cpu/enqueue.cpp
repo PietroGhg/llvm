@@ -61,9 +61,8 @@ UR_APIEXPORT ur_result_t UR_APICALL urEnqueueKernelLaunch(
 
   // TODO: add proper error checking
   // TODO: add proper event dep management
-  native_cpu::NDRDescT ndr(workDim, pGlobalWorkOffset, pGlobalWorkSize,
-                           pLocalWorkSize);
-  auto& tp = hQueue->tp;
+  native_cpu::NDRDescT ndr(workDim, pGlobalWorkOffset, pGlobalWorkSize, pLocalWorkSize);
+  auto& tp = hQueue->device->tp;
   const size_t numParallelThreads = tp.num_threads();
   hKernel->updateMemPool(numParallelThreads);
   std::vector<std::future<void>> futures;
