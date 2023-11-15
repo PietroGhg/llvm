@@ -26,6 +26,7 @@
 using namespace llvm;
 
 namespace {
+
 void fixCallingConv(Function *F) {
   // The frame-pointer=all and the "byval" attributes lead to code generation
   // that conflicts with the Kernel declaration that we emit in the Native CPU
@@ -122,7 +123,6 @@ static void processGroupCollective(Function *F, StringRef Name) {
   //  operation:
   //  * 0: reduce
   //  * 1: todo
-  llvm::errs() << "[ptrdbg] processing: " << F->getName() << "\n";
   
   // Build work list of CallInst that we want to replace.
   std::map<CallInst*, Function*> WorkList;
@@ -139,7 +139,6 @@ static void processGroupCollective(Function *F, StringRef Name) {
     auto *CI = Entry.first;
     auto* ScopeArg = CI->getArgOperand(0);
     auto* OperationArg = CI->getArgOperand(1);
-    llvm::errs() << "scope: " << *ScopeArg << " op " << *OperationArg << "\n";
     auto getIntValue = [](Value *V) {
       auto Const = dyn_cast<ConstantInt>(V);
       if(!Const) {
@@ -164,7 +163,7 @@ static void processGroupCollective(Function *F, StringRef Name) {
     if(Name.starts_with("IAdd")){
       Func = "_add_i32";
     }
-    if(Name.starts_with("FAdd")){
+    else if(Name.starts_with("FAdd")){
       Func = "_fadd_f32";    
     }
     else if (Name.starts_with("SMin")) {
@@ -189,12 +188,10 @@ static void processGroupCollective(Function *F, StringRef Name) {
       llvm_unreachable("Unsupported group collective");
     }
     auto MuxName = Prefix + Operation + Func;
-    llvm::errs() << "[ptrdbg] muxname: " << MuxName << "\n";
 
     Function *MuxBt;
     if(Scope == 2){
       MuxBt = getOrInsertWorkGroupBT(F->getParent(), MuxName, T);
-      llvm::errs() << "[ptrdbg] muxbt: " << *MuxBt << "\n";
     } else {
       llvm_unreachable("Unsupported group collective");
     }
@@ -279,8 +276,8 @@ ConvertToMuxBuiltinsSYCLNativeCPUPass::run(Module &M,
   bool ModuleChanged = false;
   for (auto &F : M) {
     if (F.getCallingConv() == llvm::CallingConv::SPIR_KERNEL) {
-      setIsKernelEntryPt(F);
       fixCallingConv(&F);
+      setIsKernelEntryPt(F);
     }
   }
   const bool VisualStudioMangling = isForVisualStudio(M.getTargetTriple());
