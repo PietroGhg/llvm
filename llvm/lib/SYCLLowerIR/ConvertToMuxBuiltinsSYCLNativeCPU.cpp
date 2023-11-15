@@ -13,17 +13,34 @@
 
 #include "llvm/SYCLLowerIR/ConvertToMuxBuiltinsSYCLNativeCPU.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/IR/Constant.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/LLVMContext.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/TargetParser/Triple.h"
 #include <map>
 
 using namespace llvm;
 
 namespace {
+void fixCallingConv(Function *F) {
+  // The frame-pointer=all and the "byval" attributes lead to code generation
+  // that conflicts with the Kernel declaration that we emit in the Native CPU
+  // helper header (in which all the kernel argument are void* or scalars).
+  auto AttList = F->getAttributes();
+  for (unsigned ArgNo = 0; ArgNo < F->getFunctionType()->getNumParams();
+       ArgNo++) {
+    if (AttList.hasParamAttr(ArgNo, Attribute::AttrKind::ByVal)) {
+      AttList = AttList.removeParamAttribute(F->getContext(), ArgNo,
+                                             Attribute::AttrKind::ByVal);
+    }
+  }
+  F->setAttributes(AttList);
+  F->addFnAttr("frame-pointer", "none");
+}
 
 // Helper macros for constructing builtin MS names
 #define GENMS1(builtin_str) "?" builtin_str "@@YA_KXZ"
@@ -84,8 +101,128 @@ Function *getMuxBarrierFunc(Module &M) {
 
 static constexpr const char *MuxKernelAttrName = "mux-kernel";
 
-void setIsKernelEntryPt(Function &F) {
+static void setIsKernelEntryPt(Function &F) {
   F.addFnAttr(MuxKernelAttrName, "entry-point");
+}
+
+static Function *getOrInsertWorkGroupBT(Module* M, StringRef MuxName, Type *T) {
+  // Work group collectives have signature T (i32, T)
+  auto *FTy = FunctionType::get(T, {Type::getInt32Ty(M->getContext()), T}, false);
+  auto FCallee = M->getOrInsertFunction(MuxName, FTy);
+  return dyn_cast<Function>(FCallee.getCallee());
+}
+
+static void processGroupCollective(Function *F, StringRef Name) {
+  auto& Ctx = F->getParent()->getContext();
+  // __spirv_Group(scope, operation, val)
+  // scope:
+  //  * 0: todo
+  //  * 1: todo
+  //  * 2: work group
+  //  operation:
+  //  * 0: reduce
+  //  * 1: todo
+  llvm::errs() << "[ptrdbg] processing: " << F->getName() << "\n";
+  
+  // Build work list of CallInst that we want to replace.
+  std::map<CallInst*, Function*> WorkList;
+  for(auto& U : F->uses()) {
+    auto *CI = dyn_cast<CallInst>(U.getUser());
+    if(!CI) {
+      report_fatal_error("Unhandled value for SYCL Native CPU");
+    }
+    WorkList.insert(std::make_pair(CI, nullptr));
+  }
+
+  // Iterate over the Instructions and map them to the right mux builtin
+  for(auto& Entry : WorkList) {
+    auto *CI = Entry.first;
+    auto* ScopeArg = CI->getArgOperand(0);
+    auto* OperationArg = CI->getArgOperand(1);
+    llvm::errs() << "scope: " << *ScopeArg << " op " << *OperationArg << "\n";
+    auto getIntValue = [](Value *V) {
+      auto Const = dyn_cast<ConstantInt>(V);
+      if(!Const) {
+        report_fatal_error("Unhandled value for SYCL Native CPU");
+      }
+      return Const->getValue();
+    };
+    auto Scope = getIntValue(ScopeArg);
+    auto Op = getIntValue(OperationArg);
+    auto *T = CI->getArgOperand(2)->getType();
+    // todo remove these once we support everything
+    assert(Scope == 2 && Op == 0 && "Unsupported group collective");
+
+    // Construct OCK function name 
+    std::string Prefix;
+    if(Scope == 2)
+      Prefix = "__mux_work_group";
+    std::string Operation;
+    if(Op == 0)
+      Operation = "_reduce";
+    std::string Func;
+    if(Name.starts_with("IAdd")){
+      Func = "_add_i32";
+    }
+    if(Name.starts_with("FAdd")){
+      Func = "_fadd_f32";    
+    }
+    else if (Name.starts_with("SMin")) {
+      Func = "_smin_i32";
+    }
+    else if (Name.starts_with("SMax")) {
+      Func = "_smax_i32";
+    }
+    else if (Name.starts_with("IMul")) {
+      Func = "_mul_i32";
+    }
+    else if (Name.starts_with("BitwiseOr")) {
+      Func = "_or_i32";
+    }
+    else if (Name.starts_with("BitwiseXor")) {
+      Func = "_xor_i32";
+    }
+    else if (Name.starts_with("BitwiseAnd")) {
+      Func = "_and_i32";
+    }
+    else {
+      llvm_unreachable("Unsupported group collective");
+    }
+    auto MuxName = Prefix + Operation + Func;
+    llvm::errs() << "[ptrdbg] muxname: " << MuxName << "\n";
+
+    Function *MuxBt;
+    if(Scope == 2){
+      MuxBt = getOrInsertWorkGroupBT(F->getParent(), MuxName, T);
+      llvm::errs() << "[ptrdbg] muxbt: " << *MuxBt << "\n";
+    } else {
+      llvm_unreachable("Unsupported group collective");
+    }
+    Entry.second = MuxBt;
+  }
+
+  for(auto& Entry : WorkList) {
+    CallInst *CI = Entry.first;
+    Function *F = Entry.second;
+    auto *Zero = ConstantInt::get(Type::getInt32Ty(Ctx), 0);
+    auto *Arg = CI->getArgOperand(2);
+    auto *NewCall = CallInst::Create(F->getFunctionType(), F, {Zero, Arg}, "mux_group_call", CI);
+    CI->replaceAllUsesWith(NewCall);
+    CI->eraseFromParent();
+  }
+}
+
+bool replaceGroupCollectives(Module& M) {
+  for(auto& F : M) {
+  auto FName = F.getName();
+  if (!FName.consume_front("_Z"))
+    continue;
+  FName = FName.drop_while([](char C) { return std::isdigit(C); });
+    if(FName.consume_front("__spirv_Group")){
+      processGroupCollective(&F, FName);
+    }
+  }
+  return false;
 }
 
 bool replaceBarriers(Module &M) {
@@ -141,8 +278,10 @@ ConvertToMuxBuiltinsSYCLNativeCPUPass::run(Module &M,
                                            ModuleAnalysisManager &MAM) {
   bool ModuleChanged = false;
   for (auto &F : M) {
-    if (F.getCallingConv() == llvm::CallingConv::SPIR_KERNEL)
+    if (F.getCallingConv() == llvm::CallingConv::SPIR_KERNEL) {
       setIsKernelEntryPt(F);
+      fixCallingConv(&F);
+    }
   }
   const bool VisualStudioMangling = isForVisualStudio(M.getTargetTriple());
 
@@ -179,5 +318,6 @@ ConvertToMuxBuiltinsSYCLNativeCPUPass::run(Module &M,
   }
 
   ModuleChanged |= replaceBarriers(M);
+  ModuleChanged |= replaceGroupCollectives(M);
   return ModuleChanged ? PreservedAnalyses::none() : PreservedAnalyses::all();
 }

@@ -20,6 +20,8 @@
 #include "compiler/utils/builtin_info.h"
 #include "compiler/utils/sub_group_analysis.h"
 #include "compiler/utils/work_item_loops_pass.h"
+#include "compiler/utils/replace_wgc_pass.h"
+#include "compiler/utils/degenerate_sub_group_pass.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
 #endif
 
@@ -28,12 +30,12 @@ void addSYCLNativeCPUBackendPasses(llvm::ModulePassManager &MPM,
                                    ModuleAnalysisManager &MAM) {
   MPM.addPass(ConvertToMuxBuiltinsSYCLNativeCPUPass());
 #ifdef NATIVECPU_USE_OCK
+  MAM.registerPass([&] { return compiler::utils::BuiltinInfoAnalysis(); });
+  MAM.registerPass([&] { return compiler::utils::SubgroupAnalysis(); });
   // Todo set options properly
   compiler::utils::WorkItemLoopsPassOptions Opts;
   Opts.IsDebug = false;
   Opts.ForceNoTail = false;
-  MAM.registerPass([&] { return compiler::utils::BuiltinInfoAnalysis(); });
-  MAM.registerPass([&] { return compiler::utils::SubgroupAnalysis(); });
   MPM.addPass(compiler::utils::WorkItemLoopsPass(Opts));
   MPM.addPass(AlwaysInlinerPass());
 
