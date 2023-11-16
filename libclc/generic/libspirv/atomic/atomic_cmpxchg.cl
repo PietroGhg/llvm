@@ -67,3 +67,14 @@ _Z29__spirv_AtomicCompareExchangePU3AS1mN5__spv5Scope4FlagENS1_19MemorySemantics
   return __sync_val_compare_and_swap_8(p, cmp, val);
 }
 #endif
+
+
+// Implementation with no AS
+#ifdef cl_khr_int64_base_atomics
+_CLC_DEF ulong
+_Z29__spirv_AtomicCompareExchangePmN5__spv5Scope4FlagENS0_19MemorySemanticsMask4FlagES4_mm(
+    volatile local ulong *p, enum Scope scope, enum MemorySemanticsMask eq,
+    enum MemorySemanticsMask neq, ulong val, ulong cmp) {
+  return __sync_val_compare_and_swap_8(p, cmp, val);
+}
+#endif
