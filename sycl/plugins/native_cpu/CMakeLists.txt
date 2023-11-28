@@ -26,4 +26,29 @@ add_sycl_plugin(native_cpu
     UnifiedRuntimeCommon
 )
 
+
+if(NATIVECPU_USE_OCK)
+  include(FetchContent)
+  FetchContent_Declare(oneapi-ck
+   GIT_REPOSITORY https://github.com/PietroGhg/oneapi-construction-kit.git
+   GIT_TAG        pietro/vecz
+  )
+  FetchContent_GetProperties(oneapi-ck)
+  if(NOT oneapi-ck_POPULATED)
+    message(STATUS "Cloning oneAPI Construction Kit")
+    FetchContent_Populate(oneapi-ck)
+    message(STATUS "oneAPI Construction Kit cloned in ${oneapi-ck_SOURCE_DIR}")
+    set(CA_NATIVE_CPU 1)
+    add_subdirectory(${oneapi-ck_SOURCE_DIR} ${oneapi-ck_BINARY_DIR})
+  endif()
+  target_compile_definitions(LLVMSYCLLowerIR PRIVATE  NATIVECPU_USE_OCK)
+  target_include_directories(LLVMSYCLLowerIR PRIVATE 
+    ${oneapi-ck_SOURCE_DIR}/modules/compiler/multi_llvm/include
+    ${oneapi-ck_SOURCE_DIR}/modules/cargo/include
+    ${oneapi-ck_SOURCE_DIR}/modules/compiler/vecz/include
+    ${oneapi-ck_SOURCE_DIR}/modules/compiler/utils/include)
+  target_link_libraries(LLVMSYCLLowerIR PRIVATE compiler-utils vecz)
+  target_compile_definitions(pi_native_cpu PRIVATE NATIVECPU_USE_OCK)
+
+endif()
 set_target_properties(pi_native_cpu PROPERTIES LINKER_LANGUAGE CXX)

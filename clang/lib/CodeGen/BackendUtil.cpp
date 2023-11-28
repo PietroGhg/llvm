@@ -50,11 +50,10 @@
 #include "llvm/SYCLLowerIR/ESIMD/LowerESIMD.h"
 #include "llvm/SYCLLowerIR/LowerWGLocalMemory.h"
 #include "llvm/SYCLLowerIR/MutatePrintfAddrspace.h"
-#include "llvm/SYCLLowerIR/PrepareSYCLNativeCPU.h"
-#include "llvm/SYCLLowerIR/RenameKernelSYCLNativeCPU.h"
 #include "llvm/SYCLLowerIR/SYCLAddOptLevelAttribute.h"
 #include "llvm/SYCLLowerIR/SYCLPropagateAspectsUsage.h"
 #include "llvm/SYCLLowerIR/SYCLPropagateJointMatrixUsage.h"
+#include "llvm/SYCLLowerIR/UtilsSYCLNativeCPU.h"
 #include "llvm/Support/BuryPointer.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -68,6 +67,7 @@
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/TargetParser/SubtargetFeature.h"
 #include "llvm/TargetParser/Triple.h"
+#include "llvm/Transforms/HipStdPar/HipStdPar.h"
 #include "llvm/Transforms/IPO/DeadArgumentElimination.h"
 #include "llvm/Transforms/HipStdPar/HipStdPar.h"
 #include "llvm/Transforms/IPO/EmbedBitcodePass.h"
@@ -115,9 +115,9 @@ static cl::opt<bool> ClSanitizeOnOptimizerEarlyEP(
     "sanitizer-early-opt-ep", cl::Optional,
     cl::desc("Insert sanitizers on OptimizerEarlyEP."), cl::init(false));
 
-static cl::opt<bool> SYCLNativeCPURename(
-    "sycl-native-cpu-rename", cl::init(false),
-    cl::desc("Rename kernel functions for SYCL Native CPU"));
+static cl::opt<bool> SYCLNativeCPUBackend(
+    "sycl-native-cpu-backend", cl::init(false),
+    cl::desc("Run the backend passes for SYCL Native CPU"));
 }
 
 namespace {
@@ -1068,8 +1068,9 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
       MPM.addPass(PB.buildPerModuleDefaultPipeline(Level));
     }
 
-    if (SYCLNativeCPURename)
-      MPM.addPass(RenameKernelSYCLNativeCPUPass());
+    if (SYCLNativeCPUBackend) {
+      llvm::sycl::utils::addSYCLNativeCPUBackendPasses(MPM, MAM, Level.getSpeedupLevel(), LangOpts.SYCLNativeCPUNoVecz);
+    }
     if (LangOpts.SYCLIsDevice) {
       MPM.addPass(SYCLMutatePrintfAddrspacePass());
       if (LangOpts.EnableDAEInSpirKernels)
@@ -1098,10 +1099,6 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
 
       // Process properties and annotations
       MPM.addPass(CompileTimePropertiesPass());
-
-      if (LangOpts.SYCLIsNativeCPU) {
-        MPM.addPass(PrepareSYCLNativeCPUPass());
-      }
 
       // Remove SYCL metadata added by the frontend, like sycl_aspects
       // Note, this pass should be at the end of the pipeline

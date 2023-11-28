@@ -63,7 +63,7 @@ if(SYCL_PI_UR_USE_FETCH_CONTENT)
   # Date:   Tue Nov 14 16:45:24 2023 +0000
   #     Merge pull request #1059 from martygrant/martin/moveNativeCPUAdapterToUR
   #     [NATIVECPU] Move Native CPU adapter to UR.
-  set(UNIFIED_RUNTIME_TAG pietro/threadpool)
+  set(UNIFIED_RUNTIME_TAG pietro/vecz_threadpool)
 
   if(SYCL_PI_UR_OVERRIDE_FETCH_CONTENT_REPO)
     set(UNIFIED_RUNTIME_REPO "${SYCL_PI_UR_OVERRIDE_FETCH_CONTENT_REPO}")
@@ -201,4 +201,14 @@ endif()
 
 if ("native_cpu" IN_LIST SYCL_ENABLE_PLUGINS)
     add_dependencies(sycl-runtime-libraries ur_adapter_native_cpu)
+
+  option(NATIVECPU_USE_OCK "Use the oneAPI Construction Kit for Native CPU" On)
+
+  if(NATIVECPU_USE_OCK)
+    message(STATUS "Compiling Native CPU adapter with OCK support.")
+    target_compile_definitions(ur_adapter_native_cpu PRIVATE NATIVECPU_USE_OCK)
+  else()
+    message(WARNING "Compiling Native CPU adapter without OCK support.
+    Some valid SYCL programs may not build or may have low performance.")
+  endif()
 endif()

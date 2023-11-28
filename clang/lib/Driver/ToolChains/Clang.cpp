@@ -5591,7 +5591,9 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
     }
     if (IsSYCLOffloadDevice && IsSYCLNativeCPU) {
       CmdArgs.push_back("-mllvm");
-      CmdArgs.push_back("-sycl-native-cpu-rename");
+      CmdArgs.push_back("-sycl-native-cpu-backend");
+      CmdArgs.push_back("-mllvm");
+      CmdArgs.push_back("-inline-threshold=10000");
     }
 
     // Also ignore explicit -force_cpusubtype_ALL option.
