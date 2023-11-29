@@ -45,3 +45,38 @@ IMPL_AS(unsigned long, m, u, 8)
 #undef FDECL
 #undef IMPL_AS
 #undef IMPL
+
+
+// Implementation with no AS, defaults to global
+#define FDECL(TYPE, PREFIX, AS, BYTE_SIZE, MEM_ORDER) \
+TYPE __clc__atomic_##PREFIX##load_##AS##_##BYTE_SIZE##_##MEM_ORDER(volatile AS const TYPE *);
+
+#define IMPL(TYPE, TYPE_MANGLED, AS, AS_MANGLED, PREFIX, BYTE_SIZE)                                               \
+  FDECL(TYPE, PREFIX, AS, BYTE_SIZE, unordered)                                                                   \
+  FDECL(TYPE, PREFIX, AS, BYTE_SIZE, acquire)                                                                     \
+  FDECL(TYPE, PREFIX, AS, BYTE_SIZE, seq_cst)                                                                     \
+  _CLC_DEF TYPE                                                                                                   \
+      _Z18__spirv_AtomicLoadPK##TYPE_MANGLED##N5__spv5Scope4FlagENS1_19MemorySemanticsMask4FlagE( \
+          volatile AS const TYPE *p, enum Scope scope,                                                            \
+          enum MemorySemanticsMask semantics) {                                                                   \
+    if (semantics & Acquire) {                                                                                    \
+      return __clc__atomic_##PREFIX##load_##AS##_##BYTE_SIZE##_acquire(p);                                        \
+    }                                                                                                             \
+    if (semantics & SequentiallyConsistent) {                                                                     \
+      return __clc__atomic_##PREFIX##load_##AS##_##BYTE_SIZE##_seq_cst(p);                                        \
+    }                                                                                                             \
+    return __clc__atomic_##PREFIX##load_##AS##_##BYTE_SIZE##_unordered(p);                                        \
+  }
+
+
+IMPL(int, i, global, AS1, , 4)
+IMPL(unsigned int, j, global, AS1, u, 4)
+
+#ifdef cl_khr_int64_base_atomics
+IMPL(long, l, global, AS1, , 8)
+IMPL(unsigned long, m, global, AS1, u, 8)
+#endif
+
+#undef FDECL
+#undef IMPL_AS
+#undef IMPL

@@ -30,3 +30,20 @@ IMPL(long, l, local, AS3, __sync_fetch_and_add_8)
 IMPL(unsigned long, m, local, AS3, __sync_fetch_and_add_8)
 #endif
 #undef IMPL
+
+
+// Implementation with no AS
+#define IMPL(TYPE, TYPE_MANGLED, AS, AS_MANGLED, FN_NAME)                                                                    \
+  _CLC_DEF TYPE                                                                                                              \
+      _Z18__spirv_AtomicIAddP##TYPE_MANGLED##N5__spv5Scope4FlagENS0_19MemorySemanticsMask4FlagE##TYPE_MANGLED( \
+          volatile AS TYPE *p, enum Scope scope,                                                                             \
+          enum MemorySemanticsMask semantics, TYPE val) {                                                                    \
+    return FN_NAME(p, val);                                                                                                  \
+  }
+
+IMPL(int, i, global, AS1, __sync_fetch_and_add)
+#ifdef cl_khr_int64_base_atomics
+IMPL(unsigned long, y, global, AS1, __sync_fetch_and_add)
+#endif
+
+#undef IMPL
