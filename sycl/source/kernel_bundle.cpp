@@ -6,6 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "sycl/backend_types.hpp"
+#include "sycl/detail/pi.h"
 #include <detail/device_binary_image.hpp>
 #include <detail/kernel_bundle_impl.hpp>
 #include <detail/kernel_compiler/kernel_compiler_opencl.hpp>
@@ -331,6 +333,8 @@ bool is_compatible(const std::vector<kernel_id> &KernelIDs, const device &Dev) {
       return BE == sycl::backend::ext_oneapi_cuda;
     } else if (strcmp(Target, __SYCL_PI_DEVICE_BINARY_TARGET_AMDGCN) == 0) {
       return BE == sycl::backend::ext_oneapi_hip;
+    } else if (strcmp(Target, __SYCL_PI_DEVICE_BINARY_TARGET_NATIVE_CPU) == 0) {
+      return BE == sycl::backend::ext_native_cpu;
     }
 
     return false;

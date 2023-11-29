@@ -24,6 +24,8 @@
 #include "compiler/utils/work_item_loops_pass.h"
 #include "vecz/pass.h"
 #include "vecz/vecz_target_info.h"
+#include "compiler/utils/replace_wgc_pass.h"
+#include "compiler/utils/degenerate_sub_group_pass.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
 #endif
 
@@ -65,6 +67,7 @@ void llvm::sycl::utils::addSYCLNativeCPUBackendPasses(llvm::ModulePassManager &M
   Opts.ForceNoTail = ForceNoTail;
   MAM.registerPass([&] { return compiler::utils::BuiltinInfoAnalysis(); });
   MAM.registerPass([&] { return compiler::utils::SubgroupAnalysis(); });
+  // Todo set options properly
   MPM.addPass(compiler::utils::WorkItemLoopsPass(Opts));
   MPM.addPass(AlwaysInlinerPass());
 #endif
