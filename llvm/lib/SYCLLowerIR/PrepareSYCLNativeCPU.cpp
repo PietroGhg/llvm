@@ -61,9 +61,7 @@ using namespace sycl::utils;
 
 namespace {
 
-void fixCallingConv(Function *F) {
-  F->setCallingConv(llvm::CallingConv::C);
-}
+void fixCallingConv(Function *F) { F->setCallingConv(llvm::CallingConv::C); }
 
 void emitSubkernelForKernel(Function *F, Type *NativeCPUArgDescType,
                             Type *StatePtrType, llvm::Constant *StateArgTLS) {
@@ -225,8 +223,7 @@ static Function *addSetLocalIdFunc(Module &M, StringRef Name, Type *StateType) {
   Type *DimTy = I32Ty;
   Type *ValTy = I64Ty;
   Type *PtrTy = PointerType::get(Ctx, NativeCPUGlobalAS);
-  static FunctionType *FTy =
-      FunctionType::get(RetTy, {DimTy, ValTy, PtrTy}, false);
+  FunctionType *FTy = FunctionType::get(RetTy, {DimTy, ValTy, PtrTy}, false);
   auto FCallee = M.getOrInsertFunction(Name, FTy);
   auto *F = cast<Function>(FCallee.getCallee());
   IRBuilder<> Builder(Ctx);
@@ -418,7 +415,7 @@ PreservedAnalyses PrepareSYCLNativeCPUPass::run(Module &M,
     }
     else if(Name != OldF->getName()) {
       auto RealKernel = M.getFunction(Name);
-      if(RealKernel) {
+      if (RealKernel) {
         // the real kernel was not inlined in the wrapper, steal its name
         OldF->takeName(RealKernel);
       } else {
