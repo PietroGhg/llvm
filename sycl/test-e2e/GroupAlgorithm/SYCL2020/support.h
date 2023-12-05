@@ -18,7 +18,7 @@ bool isSupportedDevice(device D) {
       return true;
   }
 
-  if (PlatformName.find("SYCL_NATIVE_CPU") != std::string::npos)
+  if (PlatformName.find("SYCL Native CPU") != std::string::npos)
     return true;
 
   return false;

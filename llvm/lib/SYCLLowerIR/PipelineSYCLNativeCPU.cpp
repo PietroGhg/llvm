@@ -51,6 +51,7 @@ void llvm::sycl::utils::addSYCLNativeCPUBackendPasses(
     llvm::ModulePassManager &MPM, ModuleAnalysisManager &MAM,
     unsigned OptLevel, bool DisableVecz) {
   MPM.addPass(ConvertToMuxBuiltinsSYCLNativeCPUPass());
+  MPM.addPass(compiler::utils::PrepareBarriersPass());
 #ifdef NATIVECPU_USE_OCK
   // Always enable vectorizer, unless explictly disabled or -O0 is set.
   if(OptLevel != 0 && !DisableVecz) {

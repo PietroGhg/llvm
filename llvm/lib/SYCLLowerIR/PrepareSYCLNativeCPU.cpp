@@ -338,10 +338,51 @@ static llvm::Constant *CurrentStatePointerTLS;
 PreservedAnalyses PrepareSYCLNativeCPUPass::run(Module &M,
                                                 ModuleAnalysisManager &MAM) {
   bool ModuleChanged = false;
+  // Build a list of kernels to process, we want to process only the work group
+  // wrapper functions, if vectorization occurred and the scalar kernel has been
+  // inlined, it can be removed.
+  // The wrapper function takes the name of the original kernel, since it is what 
+  // we want to register to the SYCL runtime.
   SmallVector<Function *> OldKernels;
+  SmallVector<Function *> ScalarKernels;
   for (auto &F : M) {
-    if (F.getCallingConv() == llvm::CallingConv::SPIR_KERNEL)
+    if (F.getCallingConv() != llvm::CallingConv::SPIR_KERNEL)
+      continue;
+#ifdef NATIVECPU_USE_OCK
+    auto Name = compiler::utils::getBaseFnNameOrFnName(F);
+    // if vectorization occurred, at this point we have a wrapper function that 
+    // runs the vectorized kernel and peels using the scalar kernel. We make it so
+    // this wrapper steals the original kernel name.
+    std::optional<compiler::utils::LinkMetadataResult> veczR = compiler::utils::parseVeczToOrigFnLinkMetadata(F);
+    if(veczR) {
+      auto ScalarF = veczR.value().first;
+      F.takeName(ScalarF);
+      ScalarF->setName(F.getName() + "_scalar");
+      if(ScalarF->use_empty()) {
+        ScalarKernels.push_back(ScalarF);
+      } else {
+        OldKernels.push_back(ScalarF);
+      }
       OldKernels.push_back(&F);
+    }
+    else if(Name != F.getName()) {
+      auto RealKernel = M.getFunction(Name);
+      if (RealKernel) {
+        // the real kernel was not inlined in the wrapper, steal its name
+        F.takeName(RealKernel);
+      } else {
+        // the real kernel has been inlined, just use the name
+        F.setName(Name);
+      }
+      OldKernels.push_back(&F);
+    }
+#else
+    OldKernels.push_back(&F);
+#endif
+  }
+
+  for(auto& F: ScalarKernels) {
+    F->eraseFromParent();
   }
 
   // Materialize builtins
@@ -401,29 +442,6 @@ PreservedAnalyses PrepareSYCLNativeCPUPass::run(Module &M,
 
   SmallVector<Function *> NewKernels;
   for (auto &OldF : OldKernels) {
-#ifdef NATIVECPU_USE_OCK
-    auto Name = compiler::utils::getBaseFnNameOrFnName(*OldF);
-    OldF->setName(Name);
-    // if vectorization occurred, at this point we have a wrapper function that 
-    // runs the vectorized kernel and peels using the scalar kernel. We make it so
-    // this wrapper steals the original kernel name.
-    std::optional<compiler::utils::LinkMetadataResult> veczR = compiler::utils::parseVeczToOrigFnLinkMetadata(*OldF);
-    if(veczR) {
-      auto ScalarF = veczR.value().first;
-      OldF->takeName(ScalarF);
-      ScalarF->setName(OldF->getName() + "_scalar");
-    }
-    else if(Name != OldF->getName()) {
-      auto RealKernel = M.getFunction(Name);
-      if (RealKernel) {
-        // the real kernel was not inlined in the wrapper, steal its name
-        OldF->takeName(RealKernel);
-      } else {
-        // the real kernel has been inlined, just use the name
-        OldF->setName(Name);
-      }
-    }
-#endif
     auto *NewF =
         cloneFunctionAndAddParam(OldF, StatePtrType, CurrentStatePointerTLS);
     NewF->takeName(OldF);
