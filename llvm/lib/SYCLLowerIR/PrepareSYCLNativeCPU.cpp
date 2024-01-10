@@ -50,6 +50,7 @@
 #include <vector>
 
 #ifdef NATIVECPU_USE_OCK
+#include <cctype>
 #include "compiler/utils/attributes.h"
 #include "compiler/utils/builtin_info.h"
 #include "compiler/utils/metadata.h"
@@ -61,7 +62,9 @@ using namespace sycl::utils;
 
 namespace {
 
-void fixCallingConv(Function *F) { F->setCallingConv(llvm::CallingConv::C); }
+void fixCallingConv(Function *F) {
+  F->setCallingConv(llvm::CallingConv::C);
+}
 
 void emitSubkernelForKernel(Function *F, Type *NativeCPUArgDescType,
                             Type *StatePtrType, llvm::Constant *StateArgTLS) {
@@ -166,6 +169,24 @@ Function *cloneFunctionAndAddParam(Function *OldF, Type *T,
   return NewF;
 }
 
+/*
+uint32_t NumSubGroups,
+         SubGroup_id,
+         SubGroup_local_id,
+         SubGroup_size;*/
+
+#define NCPUPREFIX "__dpcpp_nativecpu"
+         // subgroup getters
+constexpr const char* NativeCPUNumSubGroups = NCPUPREFIX "_get_num_sub_groups";
+constexpr const char* NativeCPUSubGroup_id = NCPUPREFIX "_get_sub_group_id";
+constexpr const char* NativeCPUSubGroup_local_id = NCPUPREFIX "_get_sub_group_local_id";
+constexpr const char* NativeCPUSubGroup_size = NCPUPREFIX "_get_sub_group_size";
+constexpr const char* NativeCPUSubGroup_max_size = NCPUPREFIX "_get_max_sub_group_size";
+// subgroup setters
+constexpr const char* NativeCPUSetNumSubGroups = NCPUPREFIX "_set_num_sub_groups";
+constexpr const char* NativeCPUSetSubGroup_id = NCPUPREFIX "_set_sub_group_id";
+constexpr const char* NativeCPUSetSubGroup_size = NCPUPREFIX "_set_sub_group_size";
+
 static const std::pair<StringRef, StringRef> BuiltinNamesMap[]{
     {"__mux_get_global_id", NativeCPUGlobalId},
     {"__mux_get_global_size", NativeCPUGlobaRange},
@@ -177,7 +198,14 @@ static const std::pair<StringRef, StringRef> BuiltinNamesMap[]{
     {"__mux_set_num_sub_groups", NativeCPUSetNumSubgroups},
     {"__mux_set_sub_group_id", NativeCPUSetSubgroupId},
     {"__mux_set_max_sub_group_size", NativeCPUSetMaxSubgroupSize},
-    {"__mux_set_local_id", NativeCPUSetLocalId}};
+    {"__mux_set_local_id", NativeCPUSetLocalId},
+    // subgroup getters
+    {"__mux_get_sub_group_local_id", NativeCPUSubGroup_local_id},
+    {"__mux_get_max_sub_group_size", NativeCPUSubGroup_max_size},
+    {"__mux_get_sub_group_id", NativeCPUSubGroup_id},
+    {"__mux_get_num_sub_groups", NativeCPUNumSubGroups},
+    {"__mux_get_sub_group_size", NativeCPUSubGroup_size}
+};
 
 static constexpr unsigned int NativeCPUGlobalAS = 1;
 static constexpr char StateTypeName[] = "struct.__nativecpu_state";
@@ -194,8 +222,10 @@ static Type *getStateType(Module &M) {
   auto &Ctx = M.getContext();
   auto *I64Ty = Type::getInt64Ty(Ctx);
   auto *Array3dTy = ArrayType::get(I64Ty, 3);
-  std::array<Type *, 7> Elements;
-  Elements.fill(Array3dTy);
+  std::array<Type *, 7 + 4> Elements;
+  std::fill(Elements.begin(), Elements.begin() + 7, Array3dTy);
+  auto* I32Ty = Type::getInt32Ty(Ctx);
+  std::fill(Elements.begin() + 7, Elements.begin() + 11, I32Ty);
   auto *StateType = StructType::create(Ctx, StateTypeName);
   StateType->setBody(Elements);
   return StateType;
@@ -205,7 +235,54 @@ static const StringMap<unsigned> OffsetMap{
     {NativeCPUGlobalId, 0},    {NativeCPUGlobaRange, 1},
     {NativeCPUWGSize, 2},      {NativeCPUWGId, 3},
     {NativeCPULocalId, 4},     {NativeCPUNumGroups, 5},
-    {NativeCPUGlobalOffset, 6}};
+    {NativeCPUGlobalOffset, 6},
+// Subgroup offsets
+    {NativeCPUNumSubGroups, 7}, {NativeCPUSetNumSubGroups, 7},
+    {NativeCPUSubGroup_id, 8}, {NativeCPUSetSubGroup_id, 8},
+    {NativeCPUSubGroup_local_id, 9},
+    {NativeCPUSubGroup_size, 10}, {NativeCPUSetSubGroup_size, 10},
+    {NativeCPUSubGroup_max_size, 10}, {NativeCPUSetMaxSubgroupSize, 10} //todo
+};
+
+//declare void @__mux_set_num_sub_groups(i32% val) #2
+//declare void @__mux_set_sub_group_id(i32 % val) #2
+//declare void @__mux_set_max_sub_group_size(i32 % val)
+
+//declare i32 @__mux_get_sub_group_local_id()
+//declare i32 @__mux_get_sub_group_id()
+//declare i32 @__mux_get_num_sub_groups()
+//declare i32 @__mux_get_sub_group_size()
+
+
+static Function* addSetSubGroupValFunc(Module& M, StringRef Name, Type* StateType) {
+  /*
+  void __dpcpp_nativecpu_set_num_sub_groups(size_t value,
+                                            __nativecpu_state *s) {
+    s->Name = value;
+  }
+  */
+  auto& Ctx = M.getContext();
+  Type* I32Ty = Type::getInt32Ty(Ctx);
+  Type* I64Ty = Type::getInt64Ty(Ctx);
+  Type* RetTy = Type::getVoidTy(Ctx);
+  Type* PtrTy = PointerType::get(Ctx, NativeCPUGlobalAS);
+  static FunctionType* FTy =
+    FunctionType::get(RetTy, { I32Ty, PtrTy }, false);
+  auto FCallee = M.getOrInsertFunction(Name, FTy);
+  auto* F = dyn_cast<Function>(FCallee.getCallee());
+  IRBuilder<> Builder(Ctx);
+  BasicBlock* BB = BasicBlock::Create(Ctx, "entry", F);
+  Builder.SetInsertPoint(BB);
+  auto* StatePtr = F->getArg(1);
+  auto* Zero = ConstantInt::get(I64Ty, 0);
+  auto* Offset = ConstantInt::get(I32Ty, OffsetMap.at(Name));
+  auto* GEP = Builder.CreateGEP(StateType, StatePtr, { Zero, Offset });
+  // store local id
+  auto* Val = F->getArg(0);
+  Builder.CreateStore(Val, GEP);
+  Builder.CreateRetVoid();
+  return F;
+}
 
 static Function *addSetLocalIdFunc(Module &M, StringRef Name, Type *StateType) {
   /*
@@ -223,7 +300,8 @@ static Function *addSetLocalIdFunc(Module &M, StringRef Name, Type *StateType) {
   Type *DimTy = I32Ty;
   Type *ValTy = I64Ty;
   Type *PtrTy = PointerType::get(Ctx, NativeCPUGlobalAS);
-  FunctionType *FTy = FunctionType::get(RetTy, {DimTy, ValTy, PtrTy}, false);
+  static FunctionType *FTy =
+      FunctionType::get(RetTy, {DimTy, ValTy, PtrTy}, false);
   auto FCallee = M.getOrInsertFunction(Name, FTy);
   auto *F = cast<Function>(FCallee.getCallee());
   IRBuilder<> Builder(Ctx);
@@ -281,10 +359,41 @@ static Function *addGetFunc(Module &M, StringRef Name, Type *StateType) {
   return F;
 }
 
+static Function* addSubGroupGetFunc(Module& M, StringRef Name, Type* StateType) {
+  auto& Ctx = M.getContext();
+  Type* I64Ty = Type::getInt64Ty(Ctx);
+  Type* I32Ty = Type::getInt32Ty(Ctx);
+  Type* RetTy = I32Ty;
+  Type* PtrTy = PointerType::get(Ctx, NativeCPUGlobalAS);
+  static FunctionType* FTy = FunctionType::get(RetTy, { PtrTy }, false);
+  auto FCallee = M.getOrInsertFunction(Name, FTy);
+  auto* F = dyn_cast<Function>(FCallee.getCallee());
+  IRBuilder<> Builder(Ctx);
+  BasicBlock* BB = BasicBlock::Create(Ctx, "entry", F);
+  Builder.SetInsertPoint(BB);
+  auto* Zero = ConstantInt::get(I64Ty, 0);
+  auto* Offset = ConstantInt::get(I32Ty, OffsetMap.at(Name));
+  auto* GEP =
+    Builder.CreateGEP(StateType, F->getArg(0), { Zero, Offset});
+  auto* Load = Builder.CreateLoad(I32Ty, GEP);
+  Builder.CreateRet(Load);
+  return F;
+}
+
 static Function *addReplaceFunc(Module &M, StringRef Name, Type *StateType) {
   Function *Res;
   const char GetPrefix[] = "__dpcpp_nativecpu_get";
-  if (Name.startswith(GetPrefix)) {
+  if (Name == NativeCPUNumSubGroups ||
+    Name == NativeCPUSubGroup_id ||
+    Name == NativeCPUSubGroup_local_id ||
+    Name == NativeCPUSubGroup_max_size ||
+    Name == NativeCPUSubGroup_size) {
+    Res = addSubGroupGetFunc(M, Name, StateType);
+  } else if (Name == NativeCPUSetNumSubgroups ||
+             Name == NativeCPUSetSubgroupId ||
+             Name == NativeCPUSetMaxSubgroupSize) {
+    Res = addSetSubGroupValFunc(M, Name, StateType);
+  } else if (Name.startswith(GetPrefix)) {
     Res = addGetFunc(M, Name, StateType);
   } else if (Name == NativeCPUSetLocalId) {
     Res = addSetLocalIdFunc(M, Name, StateType);
@@ -346,39 +455,8 @@ PreservedAnalyses PrepareSYCLNativeCPUPass::run(Module &M,
   SmallVector<Function *> OldKernels;
   SmallVector<Function *> ScalarKernels;
   for (auto &F : M) {
-    if (F.getCallingConv() != llvm::CallingConv::SPIR_KERNEL)
-      continue;
-#ifdef NATIVECPU_USE_OCK
-    auto Name = compiler::utils::getBaseFnNameOrFnName(F);
-    // if vectorization occurred, at this point we have a wrapper function that 
-    // runs the vectorized kernel and peels using the scalar kernel. We make it so
-    // this wrapper steals the original kernel name.
-    std::optional<compiler::utils::LinkMetadataResult> veczR = compiler::utils::parseVeczToOrigFnLinkMetadata(F);
-    if(veczR) {
-      auto ScalarF = veczR.value().first;
-      F.takeName(ScalarF);
-      ScalarF->setName(F.getName() + "_scalar");
-      if(ScalarF->use_empty()) {
-        ScalarKernels.push_back(ScalarF);
-      } else {
-        OldKernels.push_back(ScalarF);
-      }
+    if (F.getCallingConv() == llvm::CallingConv::SPIR_KERNEL)
       OldKernels.push_back(&F);
-    }
-    else if(Name != F.getName()) {
-      auto RealKernel = M.getFunction(Name);
-      if (RealKernel) {
-        // the real kernel was not inlined in the wrapper, steal its name
-        F.takeName(RealKernel);
-      } else {
-        // the real kernel has been inlined, just use the name
-        F.setName(Name);
-      }
-      OldKernels.push_back(&F);
-    }
-#else
-    OldKernels.push_back(&F);
-#endif
   }
 
   for(auto& F: ScalarKernels) {
@@ -415,7 +493,7 @@ PreservedAnalyses PrepareSYCLNativeCPUPass::run(Module &M,
     if (!Glob)
       continue;
     for (const auto &Use : Glob->uses()) {
-      auto *I = cast<CallInst>(Use.getUser());
+      auto I = cast<CallInst>(Use.getUser());
       if (!IsNativeCPUKernel(I->getFunction()) || KernelIsCalled) {
         // only use the threadlocal if we have kernels calling builtins
         // indirectly, or if the kernel is called by some other func.
@@ -441,14 +519,65 @@ PreservedAnalyses PrepareSYCLNativeCPUPass::run(Module &M,
   }
 
   SmallVector<Function *> NewKernels;
-  for (auto &OldF : OldKernels) {
+  auto cloneAndAddKernel = [&](Function *OldF, bool TakeName) {
     auto *NewF =
         cloneFunctionAndAddParam(OldF, StatePtrType, CurrentStatePointerTLS);
-    NewF->takeName(OldF);
+    if (TakeName)
+      NewF->takeName(OldF);
     OldF->replaceAllUsesWith(NewF);
     OldF->eraseFromParent();
     NewKernels.push_back(NewF);
     ModuleChanged = true;
+  };
+#ifdef NATIVECPU_USE_OCK
+  {
+    // First we find the original kernels that have the same names
+    // as the work item loop kernels. If the original kernel is called
+    // by the workitem loop kernel, clone it and change its name so
+    // it can't clash with the workitem loop kernel.
+    SmallVector<Function *> ProcessedKernels;
+    for (auto &OldF : OldKernels) {
+      auto Name = compiler::utils::getBaseFnNameOrFnName(*OldF);
+      std::optional<compiler::utils::LinkMetadataResult> veczR = compiler::utils::parseVeczToOrigFnLinkMetadata(*OldF);
+      if(veczR) {
+        // if vectorization occurred, at this point we have a wrapper function that 
+        // runs the vectorized kernel and peels using the scalar kernel. We make it so
+        // this wrapper steals the original kernel name.
+        auto ScalarF = veczR.value().first;
+        if(!ScalarF) {
+          // remove the "__vecz_vN" prefix from the function name
+          Name.consume_front("__vecz_v");
+          Name = Name.drop_until([](char c) { return !std::isdigit(c); });
+          OldF->setName(Name);
+        } else {
+          OldF->takeName(ScalarF);
+          ScalarF->setName(OldF->getName() + "_scalar");
+          ProcessedKernels.push_back(ScalarF);
+          cloneAndAddKernel(ScalarF, false);
+        }
+      }
+      else if (Name != OldF->getName()) {
+        auto RealKernel = M.getFunction(Name);
+        if (RealKernel) {
+          ProcessedKernels.push_back(RealKernel);
+          if (RealKernel->getNumUses() == 0) {
+            // todo: check if this kernel can be safely removed
+          }
+          cloneAndAddKernel(RealKernel, false);
+        }
+        OldF->setName(Name);
+        assert(OldF->getName() == Name);
+      }
+    }
+
+    for (Function *f : ProcessedKernels)
+      OldKernels.erase(std::remove(OldKernels.begin(), OldKernels.end(), f),
+                       OldKernels.end());
+  }
+#endif
+
+  for (auto &OldF : OldKernels) {
+    cloneAndAddKernel(OldF, true);
   }
 
   StructType *NativeCPUArgDescType =

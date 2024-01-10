@@ -19,6 +19,7 @@
 
 #ifdef NATIVECPU_USE_OCK
 #include "compiler/utils/builtin_info.h"
+#include "compiler/utils/define_mux_builtins_pass.h"
 #include "compiler/utils/device_info.h"
 #include "compiler/utils/prepare_barriers_pass.h"
 #include "compiler/utils/sub_group_analysis.h"
@@ -82,6 +83,9 @@ void llvm::sycl::utils::addSYCLNativeCPUBackendPasses(
   MPM.addPass(AlwaysInlinerPass());
 #endif
   MPM.addPass(PrepareSYCLNativeCPUPass());
+#ifdef NATIVECPU_USE_OCK
+  MPM.addPass(compiler::utils::DefineMuxBuiltinsPass());
+#endif
   MPM.addPass(RenameKernelSYCLNativeCPUPass());
 
   // Run optimization passes after all the changes we made to the kernels.
