@@ -453,14 +453,9 @@ PreservedAnalyses PrepareSYCLNativeCPUPass::run(Module &M,
   // The wrapper function takes the name of the original kernel, since it is what 
   // we want to register to the SYCL runtime.
   SmallVector<Function *> OldKernels;
-  SmallVector<Function *> ScalarKernels;
   for (auto &F : M) {
     if (F.getCallingConv() == llvm::CallingConv::SPIR_KERNEL)
       OldKernels.push_back(&F);
-  }
-
-  for(auto& F: ScalarKernels) {
-    F->eraseFromParent();
   }
 
   // Materialize builtins
@@ -536,6 +531,7 @@ PreservedAnalyses PrepareSYCLNativeCPUPass::run(Module &M,
     // by the workitem loop kernel, clone it and change its name so
     // it can't clash with the workitem loop kernel.
     SmallVector<Function *> ProcessedKernels;
+    SmallVector<Function *> RemovableKernels;
     for (auto &OldF : OldKernels) {
       auto Name = compiler::utils::getBaseFnNameOrFnName(*OldF);
       std::optional<compiler::utils::LinkMetadataResult> veczR = compiler::utils::parseVeczToOrigFnLinkMetadata(*OldF);
@@ -553,21 +549,36 @@ PreservedAnalyses PrepareSYCLNativeCPUPass::run(Module &M,
           OldF->takeName(ScalarF);
           ScalarF->setName(OldF->getName() + "_scalar");
           ProcessedKernels.push_back(ScalarF);
-          cloneAndAddKernel(ScalarF, false);
+          if(ScalarF->getNumUses() == 0) {
+            RemovableKernels.push_back(ScalarF);
+          } else {
+            cloneAndAddKernel(ScalarF, false);
+          }
         }
       }
       else if (Name != OldF->getName()) {
         auto RealKernel = M.getFunction(Name);
         if (RealKernel) {
+          // if the real kernel is still in the module and we give its name to 
+          // another function using setName(), LLVM will add a numeric suffix to it
+          OldF->takeName(RealKernel);
           ProcessedKernels.push_back(RealKernel);
           if (RealKernel->getNumUses() == 0) {
-            // todo: check if this kernel can be safely removed
+            RemovableKernels.push_back(RealKernel);
+          } else { 
+            cloneAndAddKernel(RealKernel, false);
           }
-          cloneAndAddKernel(RealKernel, false);
+        } else {
+          OldF->setName(Name);
         }
-        OldF->setName(Name);
+        if(OldF->getName() != Name) {
+        }
         assert(OldF->getName() == Name);
       }
+    }
+
+    for(Function *F : RemovableKernels) {
+      F->eraseFromParent();
     }
 
     for (Function *f : ProcessedKernels)
