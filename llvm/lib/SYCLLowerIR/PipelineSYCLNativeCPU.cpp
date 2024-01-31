@@ -26,8 +26,9 @@
 #include "compiler/utils/work_item_loops_pass.h"
 #include "vecz/pass.h"
 #include "vecz/vecz_target_info.h"
-#include "compiler/utils/replace_wgc_pass.h"
-#include "compiler/utils/degenerate_sub_group_pass.h"
+#include "compiler/utils/prepare_barriers_pass.h"
+#include "compiler/utils/sub_group_analysis.h"
+#include "compiler/utils/work_item_loops_pass.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
 #endif
 

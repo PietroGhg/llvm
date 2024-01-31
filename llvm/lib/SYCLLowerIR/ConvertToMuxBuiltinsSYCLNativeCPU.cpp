@@ -156,7 +156,7 @@ Function *getMuxBarrierFunc(Module &M) {
   // void __mux_work_group_barrier(i32 %id, i32 %scope, i32 %semantics)
   LLVMContext &Ctx = M.getContext();
   auto *Int32Ty = Type::getInt32Ty(Ctx);
-  static auto *MuxFTy = FunctionType::get(Type::getVoidTy(Ctx),
+  auto *MuxFTy = FunctionType::get(Type::getVoidTy(Ctx),
                                           {Int32Ty, Int32Ty, Int32Ty}, false);
   auto F = M.getOrInsertFunction(MuxBarrier, MuxFTy);
   return cast<Function>(F.getCallee());
