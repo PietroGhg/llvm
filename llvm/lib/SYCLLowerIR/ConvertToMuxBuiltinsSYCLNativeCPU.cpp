@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/SYCLLowerIR/ConvertToMuxBuiltinsSYCLNativeCPU.h"
+#include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/Constant.h"
 #include "llvm/IR/Constants.h"
@@ -22,6 +23,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/TargetParser/Triple.h"
 #include <map>
+#include <optional>
 
 using namespace llvm;
 
@@ -201,15 +203,24 @@ static void processGroupCollective(Function *F, StringRef Name) {
     auto *CI = Entry.first;
     auto* ScopeArg = CI->getArgOperand(0);
     auto* OperationArg = CI->getArgOperand(1);
-    auto getIntValue = [](Value *V) {
+    auto getIntValue = [](Value *V) ->  std::optional<APInt>{
       auto Const = dyn_cast<ConstantInt>(V);
       if(!Const) {
-        report_fatal_error("Unhandled value for SYCL Native CPU");
+        //report_fatal_error("Unhandled value for SYCL Native CPU");
+        return {};
       }
       return Const->getValue();
     };
     auto Scope = getIntValue(ScopeArg);
+    if(!Scope) {
+      Entry.second = nullptr;
+      continue;
+    }
     auto Op = getIntValue(OperationArg);
+    if(!Op) {
+      Entry.second = nullptr;
+      continue;
+    }
     auto *T = CI->getArgOperand(2)->getType();
     // todo remove these once we support everything
     assert(Scope == 2 && Op == 0 && "Unsupported group collective");
@@ -261,6 +272,9 @@ static void processGroupCollective(Function *F, StringRef Name) {
   }
 
   for(auto& Entry : WorkList) {
+    if(!Entry.second) {
+      continue;
+    }
     CallInst *CI = Entry.first;
     Function *F = Entry.second;
     auto *Zero = ConstantInt::get(Type::getInt32Ty(Ctx), 0);

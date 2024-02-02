@@ -42,6 +42,7 @@ IMPL(unsigned long, m, local, AS3, __sync_fetch_and_add_8)
   }
 
 IMPL(int, i, global, AS1, __sync_fetch_and_add)
+IMPL(unsigned int, j, global, AS1, __sync_fetch_and_add)
 #ifdef cl_khr_int64_base_atomics
 IMPL(unsigned long, y, global, AS1, __sync_fetch_and_add)
 #endif
