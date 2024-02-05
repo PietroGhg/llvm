@@ -388,7 +388,7 @@ static Function *addReplaceFunc(Module &M, StringRef Name, Type *StateType) {
              Name == NativeCPUSetSubgroupId ||
              Name == NativeCPUSetMaxSubgroupSize) {
     Res = addSetSubGroupValFunc(M, Name, StateType);
-  } else if (Name.startswith(GetPrefix)) {
+  } else if (Name.starts_with(GetPrefix)) {
     Res = addGetFunc(M, Name, StateType);
   } else if (Name == NativeCPUSetLocalId) {
     Res = addSetLocalIdFunc(M, Name, StateType);
@@ -422,7 +422,7 @@ static Function *getReplaceFunc(Module &M, StringRef Name, Type *StateType) {
 }
 
 static Value *getStateArg(Function *F, llvm::Constant *StateTLS) {
-  // Todo: we should probably cache the state thread local load here 
+  // Todo: we should probably cache the state thread local load here
   // to avoid re-emitting it for each builtin
   if (StateTLS) {
     IRBuilder<> BB(&*F->getEntryBlock().getFirstInsertionPt());
@@ -483,12 +483,12 @@ PreservedAnalyses PrepareSYCLNativeCPUPass::run(Module &M,
   CurrentStatePointerTLS = nullptr;
 
   // check if any of the kernels is called by some other function.
-  // This can happen e.g. with OCK, where wrapper functions are 
-  // created around the origianl kernel.
+  // This can happen e.g. with OCK, where wrapper functions are
+  // created around the original kernel.
   bool KernelIsCalled = false;
-  for(auto& K : OldKernels) {
-    for(auto& U : K->uses()){
-      if(isa<CallBase>(U.getUser())) {
+  for (auto &K : OldKernels) {
+    for (auto &U : K->uses()) {
+      if (isa<CallBase>(U.getUser())) {
         KernelIsCalled = true;
       }
     }

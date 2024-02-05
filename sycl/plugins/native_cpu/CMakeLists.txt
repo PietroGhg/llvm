@@ -29,8 +29,13 @@ add_sycl_plugin(native_cpu
 if(NATIVECPU_USE_OCK)
   include(FetchContent)
   FetchContent_Declare(oneapi-ck
-   GIT_REPOSITORY https://github.com/PietroGhg/oneapi-construction-kit.git
-   GIT_TAG        pietro/vecz
+   GIT_REPOSITORY https://github.com/codeplaysoftware/oneapi-construction-kit.git
+   #  commit 63f4ba99fc758ffc4268a807b21816b6be1b1b68
+   #  Author: PietroGhg <38155419+PietroGhg@users.noreply.github.com>
+   #  Date:   Wed Jan 31 14:06:36 2024 +0100
+   #  Merge pull request #326 from PietroGhg/pietro/vecz
+   #  Integrate vecz in experimental branch
+   GIT_TAG 63f4ba99fc758ffc4268a807b21816b6be1b1b68
   )
   FetchContent_GetProperties(oneapi-ck)
   if(NOT oneapi-ck_POPULATED)
@@ -38,7 +43,7 @@ if(NATIVECPU_USE_OCK)
     FetchContent_Populate(oneapi-ck)
     message(STATUS "oneAPI Construction Kit cloned in ${oneapi-ck_SOURCE_DIR}")
     set(CA_NATIVE_CPU 1)
-    add_subdirectory(${oneapi-ck_SOURCE_DIR} ${oneapi-ck_BINARY_DIR})
+    add_subdirectory(${oneapi-ck_SOURCE_DIR} ${oneapi-ck_BINARY_DIR} EXCLUDE_FROM_ALL)
   endif()
   target_compile_definitions(LLVMSYCLLowerIR PRIVATE  NATIVECPU_USE_OCK)
   target_include_directories(LLVMSYCLLowerIR PRIVATE 

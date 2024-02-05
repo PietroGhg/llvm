@@ -125,11 +125,6 @@ cl::opt<bool> ClRelinkBuiltinBitcodePostop(
 static cl::opt<bool> SYCLNativeCPUBackend(
     "sycl-native-cpu-backend", cl::init(false),
     cl::desc("Run the backend passes for SYCL Native CPU"));
-
-static cl::opt<bool> SYCLNativeCPUNoVecz(
-    "sycl-native-cpu-no-vecz", cl::init(false),
-    cl::desc("Disable vectorizer for SYCL Native CPU"));
-
 } // namespace llvm
 
 namespace {
@@ -443,6 +438,7 @@ static bool initTargetOptions(DiagnosticsEngine &Diags,
   Options.UniqueBasicBlockSectionNames =
       CodeGenOpts.UniqueBasicBlockSectionNames;
   Options.TLSSize = CodeGenOpts.TLSSize;
+  Options.EnableTLSDESC = CodeGenOpts.EnableTLSDESC;
   Options.EmulatedTLS = CodeGenOpts.EmulatedTLS;
   Options.DebuggerTuning = CodeGenOpts.getDebuggerTuning();
   Options.EmitStackSizeSection = CodeGenOpts.StackSizeSection;
@@ -1083,7 +1079,8 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
     }
 
     if (SYCLNativeCPUBackend) {
-      llvm::sycl::utils::addSYCLNativeCPUBackendPasses(MPM, MAM, Level.getSpeedupLevel(), SYCLNativeCPUNoVecz);
+      llvm::sycl::utils::addSYCLNativeCPUBackendPasses(MPM, MAM,
+                                                       Level.getSpeedupLevel());
     }
     if (LangOpts.SYCLIsDevice) {
       MPM.addPass(SYCLMutatePrintfAddrspacePass());
