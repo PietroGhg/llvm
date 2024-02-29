@@ -57,13 +57,13 @@ if(SYCL_PI_UR_USE_FETCH_CONTENT)
   include(FetchContent)
 
   set(UNIFIED_RUNTIME_REPO "https://github.com/oneapi-src/unified-runtime.git")
-  # commit cd97e172cbbfc411fccb0b80e0fff6f9126574f4
-  # Merge: bd745d10 2a9ded6f
+  # commit 91c6068bb581acf72f02f1284ab0464ec4f03e34 
+  # Merge: de328246 89ad3408
   # Author: Kenneth Benzie (Benie) <k.benzie@codeplay.com>
-  # Date:   Fri Feb 2 14:24:16 2024 +0000
-  #     Merge pull request #1249 from GeorgeWeb/georgi/hip_memadvise_coarse_grained
-  #     [HIP] Implement coarse-grained memory advice for the HIP adapter
-  set(UNIFIED_RUNTIME_TAG cd97e172cbbfc411fccb0b80e0fff6f9126574f4)
+  # Date:   Fri Feb 23 13:39:03 2024 +0000
+  #     Merge pull request #1274 from isaacault/iault/image_array_copy
+  #     [Bindless][Exp] Add Support For Image Arrays
+  set(UNIFIED_RUNTIME_TAG 91c6068bb581acf72f02f1284ab0464ec4f03e34 )
 
   if(SYCL_PI_UR_OVERRIDE_FETCH_CONTENT_REPO)
     set(UNIFIED_RUNTIME_REPO "${SYCL_PI_UR_OVERRIDE_FETCH_CONTENT_REPO}")
@@ -124,7 +124,7 @@ set(UNIFIED_RUNTIME_COMMON_INCLUDE_DIR "${UNIFIED_RUNTIME_SOURCE_DIR}/source/com
 
 add_library(UnifiedRuntimeLoader ALIAS ur_loader)
 add_library(UnifiedRuntimeCommon ALIAS ur_common)
-add_library(UnifiedMallocFramework ALIAS unified_malloc_framework)
+add_library(UnifiedMemoryFramework ALIAS umf)
 
 add_library(UnifiedRuntime-Headers INTERFACE)
 

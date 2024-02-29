@@ -27,6 +27,8 @@
 #include "vecz/pass.h"
 #include "vecz/vecz_target_info.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
+#include "vecz/pass.h"
+#include "vecz/vecz_target_info.h"
 #endif
 
 using namespace llvm;
@@ -88,10 +90,4 @@ void llvm::sycl::utils::addSYCLNativeCPUBackendPasses(
   MPM.addPass(PrepareSYCLNativeCPUPass());
   MPM.addPass(RenameKernelSYCLNativeCPUPass());
 
-  // Run optimization passes after all the changes we made to the kernels.
-  // Todo: check optimization level from clang
-  // Todo: maybe we could find a set of relevant passes instead of re-running
-  // the full optimization pipeline.
-  PassBuilder PB;
-  MPM.addPass(PB.buildPerModuleDefaultPipeline(OptLevel));
 }
