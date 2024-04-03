@@ -313,11 +313,17 @@ macro(add_libclc_builtin_set arch_suffix)
 
   set( builtins_opt_lib $<TARGET_PROPERTY:${builtins_opt_lib_tgt},TARGET_FILE> )
 
+  if(LIBCLC_CUSTOM_LLVM_TOOLS_BINARY_DIR)
+    set(PREPARE_BUILTINS "${LIBCLC_CUSTOM_LLVM_TOOLS_BINARY_DIR}/prepare_builtins")
+  else()
+    set(PREPARE_BUILTINS prepare_builtins)
+  endif()
+
   # Add prepare target
   set( obj_suffix ${arch_suffix}.bc )
   add_custom_command( OUTPUT ${LIBCLC_LIBRARY_OUTPUT_INTDIR}/${obj_suffix}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${LIBCLC_LIBRARY_OUTPUT_INTDIR}
-    COMMAND prepare_builtins -o ${LIBCLC_LIBRARY_OUTPUT_INTDIR}/${obj_suffix}
+    COMMAND ${PREPARE_BUILTINS} -o ${LIBCLC_LIBRARY_OUTPUT_INTDIR}/${obj_suffix}
       ${builtins_opt_lib}
     DEPENDS ${builtins_opt_lib} ${builtins_opt_lib_tgt} prepare_builtins )
   add_custom_target( prepare-${obj_suffix} ALL
