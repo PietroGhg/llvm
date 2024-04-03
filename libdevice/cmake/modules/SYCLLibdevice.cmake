@@ -19,8 +19,13 @@ set(bc_binary_dir "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
 set(install_dest_lib lib${LLVM_LIBDIR_SUFFIX})
 set(install_dest_bc lib${LLVM_LIBDIR_SUFFIX})
 
-set(clang $<TARGET_FILE:clang>)
-set(llvm-ar $<TARGET_FILE:llvm-ar>)
+if(LLVM_NATIVE_TOOL_DIR)
+  set(clang "${LLVM_NATIVE_TOOL_DIR}/clang")
+  set(llvm-ar "${LLVM_NATIVE_TOOL_DIR}/llvm-ar")
+else()
+  set(clang $<TARGET_FILE:clang>)
+  set(llvm-ar $<TARGET_FILE:llvm-ar>)
+endif()
 
 string(CONCAT sycl_targets_opt
   "-fsycl-targets="
@@ -29,6 +34,8 @@ string(CONCAT sycl_targets_opt
   "spir64_fpga-unknown-unknown,"
   "spir64-unknown-unknown,"
   "spirv64-unknown-unknown")
+
+set(LIBDEVICE_CROSS_OPTS "" CACHE STRING "Cross compilation options for libdevice")
 
 set(compile_opts
   # suppress an error about SYCL_EXTERNAL being used for
@@ -39,6 +46,8 @@ set(compile_opts
   -Wno-undefined-internal
   -sycl-std=2020
   )
+separate_arguments(CROSS_FLAGS UNIX_COMMAND "${LIBDEVICE_CROSS_OPTS}")
+list(APPEND compile_opts ${CROSS_FLAGS})
 
 set(SYCL_LIBDEVICE_GCC_TOOLCHAIN "" CACHE PATH "Path to GCC installation")
 
@@ -231,6 +240,7 @@ set(imf_bf16_fallback_src ${imf_fallback_src_dir}/imf_bf16_fallback.cpp)
 
 set(imf_host_cxx_flags -c
   -D__LIBDEVICE_HOST_IMPL__
+  ${CROSS_FLAGS}
 )
 
 macro(mangle_name str output)
