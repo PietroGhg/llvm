@@ -51,7 +51,19 @@ using namespace sycl::utils;
 
 namespace {
 
-void fixCallingConv(Function *F) { F->setCallingConv(llvm::CallingConv::C); }
+// Doesn't need to traverse the call graph since we are calling this function
+// on all the Functions in the Module, but it also needs to set the
+// CallingConv on the call instructions.
+void fixCallingConv(Function *F) {
+  F->setCallingConv(llvm::CallingConv::C);
+  for (auto& BB : *F) {
+    for(auto& I : BB) {
+      if(auto *CI = dyn_cast<CallInst>(&I)) {
+        CI->setCallingConv(llvm::CallingConv::C);
+      }
+    }
+  }
+}
 
 void emitSubkernelForKernel(Function *F, Type *NativeCPUArgDescType,
                             Type *StatePtrType, llvm::Constant *StateArgTLS) {
@@ -110,8 +122,6 @@ void emitSubkernelForKernel(Function *F, Type *NativeCPUArgDescType,
   Builder.CreateCall(KernelTy, F, KernelArgs);
   Builder.CreateRetVoid();
 
-  fixCallingConv(F);
-  fixCallingConv(SubhF);
   // Add sycl-module-id attribute
   // Todo: we may want to copy other attributes to the subhandler,
   // but we can't simply use setAttributes(F->getAttributes) since
@@ -421,6 +431,13 @@ PreservedAnalyses PrepareSYCLNativeCPUPass::run(Module &M,
 
     // Finally, we erase the builtin from the module
     Glob->eraseFromParent();
+  }
+
+  // Handle calling convention for functions in the module
+  for (auto& F : M) {
+    if (F.getCallingConv() != llvm::CallingConv::C) {
+      fixCallingConv(&F);
+    }
   }
 
 #ifdef NATIVECPU_USE_OCK
