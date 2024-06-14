@@ -40,6 +40,9 @@ set( LIBCLC_MIN_LLVM 3.9.0 )
 set( LIBCLC_TARGETS_TO_BUILD "all"
     CACHE STRING "Semicolon-separated list of libclc targets to build, or 'all'." )
 
+set( LIBCLC_RISCV_FEATURES "i;m;a;f;d"
+  CACHE STRING "Semicolon-separated list of target features for RISC-V, defaults to i;m;a;f;d")
+
 option( ENABLE_RUNTIME_SUBNORMAL "Enable runtime linking of subnormal support." OFF )
 
 set( LIBCLC_NATIVECPU_FLAGS_X86_64 ""
@@ -205,6 +208,7 @@ set( spirv64-mesa3d-_devices none )
 # TODO: Does this need to be set for each possible triple?
 set( x86_64-unknown-linux-gnu_devices none )
 set( aarch64-unknown-linux-gnu_devices none )
+set( riscv64-unknown-linux-gnu_devices none )
 
 # Setup aliases
 set( cedar_aliases palm sumo sumo2 redwood juniper )
@@ -282,7 +286,7 @@ else(LIBCLC_STANDALONE_BUILD)
 endif(LIBCLC_STANDALONE_BUILD)
 file( TO_CMAKE_PATH ${LIBCLC_LIBRARY_OUTPUT_INTDIR}/clc LIBCLC_LIBRARY_OUTPUT_INTDIR )
 
-set(NATIVECPU_SUPPORTED_ARCH "x86_64;aarch64")
+set(NATIVECPU_SUPPORTED_ARCH "x86_64;aarch64;riscv64")
 
 foreach( t ${LIBCLC_TARGETS_TO_BUILD} )
   message( STATUS "libclc target '${t}' is enabled" )
@@ -360,6 +364,10 @@ foreach( t ${LIBCLC_TARGETS_TO_BUILD} )
         list( APPEND flags -Xclang -fsycl-is-native-cpu )
         if( ARCH  STREQUAL x86_64 )
           list( APPEND flags ${LIBCLC_NATIVECPU_FLAGS_X86_64})
+        elseif( ARCH  STREQUAL riscv64)
+          # Build -march flag given RISC-V features
+          list(JOIN LIBCLC_RISCV_FEATURES "" MARCH)
+          list( APPEND flags -Xclang -fsycl-is-native-cpu -march="rv64${MARCH}" )
         endif()
       endif()
     endif()
@@ -396,6 +404,12 @@ foreach( t ${LIBCLC_TARGETS_TO_BUILD} )
     elseif( IS_NATIVE_CPU_ARCH )
       set( opt_flags -O3 )
       set( has_distinct_generic_addrspace FALSE )
+      if( ${ARCH} STREQUAL "riscv64")
+        # Build -mattr flag for opt
+        list(JOIN LIBCLC_RISCV_FEATURES ",+" MATTRS)
+        set( opt_flags -O3 -mattr=+${MATTRS})
+        set( has_distinct_generic_addrspace FALSE )
+      endif()
     else()
       set( opt_flags -O3 )
     endif()
@@ -411,11 +425,15 @@ foreach( t ${LIBCLC_TARGETS_TO_BUILD} )
     string(CONCAT CL_3_0_EXTENSIONS
       "-cl-ext="
       "+cl_khr_fp64,"
-      "+cl_khr_fp16,"
       "+__opencl_c_3d_image_writes,"
       "+__opencl_c_images,"
       "+cl_khr_3d_image_writes")
-    if( ARCH STREQUAL "aarch64")
+    # fp16 is technically optional, but currently only RISC-V may not support it
+    if( NOT ARCH STREQUAL "riscv64" OR
+        ( ARCH STREQUAL "riscv64" AND "zfh" IN_LIST LIBCLC_RISCV_FEATURES ))
+      string(APPEND CL_3_0_EXTENSIONS ",+cl_khr_fp16")
+    endif()
+    if( ARCH STREQUAL "aarch64" OR ARCH STREQUAL "riscv64" )
       string( APPEND CL_3_0_EXTENSIONS ",+cl_clang_storage_class_specifiers,+__opencl_c_fp64,+cl_khr_int64_base_atomics" )
     endif()
     if( supports_generic_addrspace )
