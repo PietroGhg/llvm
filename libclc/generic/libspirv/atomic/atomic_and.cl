@@ -38,7 +38,7 @@ IMPL(unsigned long, m, local, U3AS3, 1, __sync_fetch_and_and_8)
 IMPL_GENERIC(int, i, __sync_fetch_and_and)
 IMPL_GENERIC(unsigned int, j, __sync_fetch_and_and)
 
-#ifdef cl_khr_int64_base_atomics
+#ifdef cl_khr_int64_extended_atomics
 IMPL_GENERIC(long, l, __sync_fetch_and_and_8)
 IMPL_GENERIC(unsigned long, m, __sync_fetch_and_and_8)
 #endif
