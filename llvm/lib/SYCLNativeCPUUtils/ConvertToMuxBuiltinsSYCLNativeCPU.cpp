@@ -13,6 +13,7 @@
 
 #include "llvm/SYCLLowerIR/ConvertToMuxBuiltinsSYCLNativeCPU.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/IR/Attributes.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
@@ -40,6 +41,9 @@ static void fixFunctionAttributes(Function *F) {
   }
   F->setAttributes(AttList);
   F->addFnAttr("frame-pointer", "none");
+  if(!F->hasFnAttribute(Attribute::AttrKind::NoInline)) {
+    F->addFnAttr(Attribute::AttrKind::AlwaysInline);
+  }
 }
 
 static constexpr const char *MuxKernelAttrName = "mux-kernel";

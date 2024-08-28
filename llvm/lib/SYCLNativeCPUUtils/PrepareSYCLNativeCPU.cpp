@@ -16,6 +16,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constant.h"
+#include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/PassManager.h"
@@ -39,6 +40,8 @@
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/GlobalStatus.h"
 #include "llvm/Transforms/Utils/ValueMapper.h"
+#include <iterator>
+#include <regex>
 #include <utility>
 #include <vector>
 
@@ -55,7 +58,7 @@ namespace {
 
 void fixCallingConv(Function *F) { F->setCallingConv(llvm::CallingConv::C); }
 
-void emitSubkernelForKernel(Function *F, Type *NativeCPUArgDescType,
+void emitSubhandlerForKernel(Function *F, Type *NativeCPUArgDescType, Type *StateType,
                             Type *StatePtrType, llvm::Constant *StateArgTLS) {
   LLVMContext &Ctx = F->getContext();
   Type *NativeCPUArgDescPtrType = PointerType::getUnqual(NativeCPUArgDescType);
@@ -106,8 +109,16 @@ void emitSubkernelForKernel(Function *F, Type *NativeCPUArgDescType,
   if (StateArgTLS) {
     Value *Addr = Builder.CreateThreadLocalAddress(StateArgTLS);
     Builder.CreateStore(SubhF->getArg(1), Addr);
-  } else
-    KernelArgs.push_back(SubhF->getArg(1));
+  } else {
+    // Copy the state struct on the stack to allow better optimizations.
+    auto StateArg = SubhF->getArg(1);
+    DataLayout DL(F->getParent());
+    auto StateSize = DL.getTypeAllocSize(StateType);
+    auto *StateStackPtr = Builder.CreateAlloca(StateType, 1);
+    Builder.CreateMemCpy(StateStackPtr, StateStackPtr->getAlign(), 
+        StateArg, StateArg->getParamAlign(), StateSize);
+    KernelArgs.push_back(StateStackPtr);
+  }
 
   Builder.CreateCall(KernelTy, F, KernelArgs);
   Builder.CreateRetVoid();
@@ -186,7 +197,31 @@ static constexpr char StateTypeName[] = "struct.__nativecpu_state";
 static Type *getStateType(Module &M) {
   // __nativecpu_state type
   auto &Ctx = M.getContext();
-  return StructType::create(Ctx, StateTypeName);
+  /*
+  size_t MGlobal_id[3];
+  size_t MGlobal_range[3];
+  size_t MWorkGroup_size[3];
+  size_t MWorkGroup_id[3];
+  size_t MLocal_id[3];
+  size_t MNumGroups[3];
+  size_t MGlobalOffset[3];
+  uint32_t NumSubGroups, SubGroup_id, SubGroup_local_id, SubGroup_size;
+  */
+  SmallVector<Type*> Elems;
+
+  // TODO: check 32 bit
+  auto SizeT = Type::getInt64Ty(Ctx);
+  auto ThreeSizeT = ArrayType::get(SizeT, 3);
+  constexpr unsigned int NumTriplets = 7;
+  constexpr unsigned int NumI32 = 4;
+  for(unsigned int I = 0; I < NumTriplets; I++) {
+    Elems.push_back(ThreeSizeT);
+  }
+  for(unsigned int I = 0; I < NumI32; I++) {
+    Elems.push_back(Type::getInt32Ty(Ctx));
+  }
+  auto STy = StructType::create(Ctx, Elems, StateTypeName);
+  return STy;
 }
 
 static Function *addReplaceFunc(Module &M, StringRef Name, Type *RetTy,
@@ -287,51 +322,6 @@ PreservedAnalyses PrepareSYCLNativeCPUPass::run(Module &M,
 
   llvm::Constant *CurrentStatePointerTLS = nullptr;
 
-  // check if any of the kernels is called by some other function.
-  // This can happen e.g. with OCK, where wrapper functions are
-  // created around the original kernel.
-  bool KernelIsCalled = false;
-  for (auto &K : OldKernels) {
-    for (auto &U : K->uses()) {
-      if (isa<CallBase>(U.getUser())) {
-        KernelIsCalled = true;
-      }
-    }
-  }
-
-  // Then we iterate over all the supported builtins, find the used ones
-  llvm::SmallVector<std::pair<llvm::Function *, StringRef>> UsedBuiltins;
-  for (const auto &Entry : BuiltinNamesMap) {
-    auto *Glob = M.getFunction(Entry.first);
-    if (!Glob)
-      continue;
-    if (CurrentStatePointerTLS == nullptr) {
-      for (const auto &Use : Glob->uses()) {
-        auto *I = cast<CallBase>(Use.getUser());
-        if (KernelIsCalled ||
-            IsNonKernelCalledByNativeCPUKernel(I->getFunction())) {
-          // only use the threadlocal if we have kernels calling builtins
-          // indirectly, or if the kernel is called by some other func.
-          CurrentStatePointerTLS = M.getOrInsertGlobal(
-              STATE_TLS_NAME, StatePtrType, [&M, StatePtrType]() {
-                GlobalVariable *p = new GlobalVariable(
-                    M, StatePtrType, false,
-                    GlobalValue::LinkageTypes::
-                        InternalLinkage /*todo: make external linkage to share
-                                           variable*/
-                    ,
-                    nullptr, STATE_TLS_NAME, nullptr,
-                    GlobalValue::ThreadLocalMode::GeneralDynamicTLSModel, 1,
-                    false);
-                p->setInitializer(Constant::getNullValue(StatePtrType));
-                return p;
-              });
-          break;
-        }
-      }
-    }
-    UsedBuiltins.push_back({Glob, Entry.second});
-  }
 
 #ifdef NATIVECPU_USE_OCK
   {
@@ -380,7 +370,14 @@ PreservedAnalyses PrepareSYCLNativeCPUPass::run(Module &M,
             RemovableFuncs.insert(OrigF);
           OldF->takeName(OrigF);
         } else {
-          OldF->setName(Name);
+          if (Name.starts_with("__vecz")) {
+            // TODO: no "truly" original kernel name in metadata, remove the __vecz_vN prefix
+            std::regex R("__vecz_v[0-9]*_");
+            auto Newname = std::regex_replace(Name.str(), R, "");
+            OldF->setName(Newname);
+          } else {
+            OldF->setName(Name);
+          }
         }
       }
     }
@@ -409,6 +406,51 @@ PreservedAnalyses PrepareSYCLNativeCPUPass::run(Module &M,
     }
   }
 #endif
+  // check if any of the kernels is called by some other function.
+  // This can happen e.g. with OCK, where wrapper functions are
+  // created around the original kernel.
+  bool KernelIsCalled = false;
+  for (auto &K : OldKernels) {
+    for (auto &U : K->uses()) {
+      if (isa<CallBase>(U.getUser())) {
+        KernelIsCalled = true;
+      }
+    }
+  }
+
+  // Then we iterate over all the supported builtins, find the used ones
+  llvm::SmallVector<std::pair<llvm::Function *, StringRef>> UsedBuiltins;
+  for (const auto &Entry : BuiltinNamesMap) {
+    auto *Glob = M.getFunction(Entry.first);
+    if (!Glob)
+      continue;
+    if (CurrentStatePointerTLS == nullptr) {
+      for (const auto &Use : Glob->uses()) {
+        auto *I = cast<CallBase>(Use.getUser());
+        if (KernelIsCalled ||
+            IsNonKernelCalledByNativeCPUKernel(I->getFunction())) {
+          // only use the threadlocal if we have kernels calling builtins
+          // indirectly, or if the kernel is called by some other func.
+          CurrentStatePointerTLS = M.getOrInsertGlobal(
+              STATE_TLS_NAME, StatePtrType, [&M, StatePtrType]() {
+                GlobalVariable *p = new GlobalVariable(
+                    M, StatePtrType, false,
+                    GlobalValue::LinkageTypes::
+                        InternalLinkage /*todo: make external linkage to share
+                                           variable*/
+                    ,
+                    nullptr, STATE_TLS_NAME, nullptr,
+                    GlobalValue::ThreadLocalMode::GeneralDynamicTLSModel, 1,
+                    false);
+                p->setInitializer(Constant::getNullValue(StatePtrType));
+                return p;
+              });
+          break;
+        }
+      }
+    }
+    UsedBuiltins.push_back({Glob, Entry.second});
+  }
 
   SmallVector<Function *> NewKernels;
   for (auto &OldF : OldKernels) {
@@ -424,7 +466,7 @@ PreservedAnalyses PrepareSYCLNativeCPUPass::run(Module &M,
   StructType *NativeCPUArgDescType =
       StructType::create({PointerType::getUnqual(M.getContext())});
   for (auto &NewK : NewKernels) {
-    emitSubkernelForKernel(NewK, NativeCPUArgDescType, StatePtrType,
+    emitSubhandlerForKernel(NewK, NativeCPUArgDescType, StateType, StatePtrType,
                            CurrentStatePointerTLS);
   }
 
